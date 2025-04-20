@@ -1,0 +1,30 @@
+{
+    "name": "typed-env",
+    "version": "0.0.1",
+    "description": "typed-env is a zero-dependency, TypeScript-native library to load and validate environment variables using a custom schema. Get fully typed, safe, and reliable config objects with ease.",
+    "license": "MIT",
+    "author": "Ashutosh Kumar",
+    "type": "commonjs",
+    "main": "dist/index.js",
+    "scripts": {
+        "build": "tsc",
+        "prettier": "prettier --write src/**/*.ts",
+        "prepublishOnly": "npm run build",
+        "lint": "gts lint",
+        "clean": "gts clean",
+        "compile": "tsc",
+        "fix": "gts fix",
+        "prepare": "npm run compile",
+        "pretest": "npm run compile",
+        "posttest": "npm run lint"
+    },
+    "files": [
+        "dist"
+    ],
+    "devDependencies": {
+        "@types/node": "^22.7.5",
+        "prettier": "^3.5.3",
+        "typescript": "^5.6.3",
+        "gts": "^6.0.2"
+    }
+}
