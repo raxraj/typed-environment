@@ -1,7 +1,7 @@
 {
-    "name": "ts-env",
+    "name": "typed-environment",
     "version": "0.0.2",
-    "description": "ts-env is a zero-dependency, TypeScript-native library to load and validate environment variables using a custom schema. Get fully typed, safe, and reliable config objects with ease.",
+    "description": "typed-environment is a zero-dependency, TypeScript-native library to load and validate environment variables using a custom schema. Get fully typed, safe, and reliable config objects with ease.",
     "license": "MIT",
     "author": "Ashutosh Kumar",
     "type": "commonjs",
