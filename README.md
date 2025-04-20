@@ -31,14 +31,14 @@ yarn add typed-environment
 import TypedEnv from 'typed-environment';
 
 const environmentSchema = {
-    PORT: {
-        type: "number",
-        default: 8090
-    },
-    SECRET_KEY: {
-        type: "string",
-        required: true
-    }
+  PORT: {
+    type: 'number',
+    default: 8090,
+  },
+  SECRET_KEY: {
+    type: 'string',
+    required: true,
+  },
 };
 const typedEnv = new TypedEnv(environmentSchema);
 
@@ -51,10 +51,10 @@ The library will throw detailed errors when required variables are missing or va
 
 ```typescript
 try {
-    const env = typedEnv.init();
+  const env = typedEnv.init();
 } catch (error) {
-    console.error('Environment configuration error:', error.message);
-    // Example: "Environment variable "API_KEY" is required but is missing."
+  console.error('Environment configuration error:', error.message);
+  // Example: "Environment variable "API_KEY" is required but is missing."
 }
 ```
 
@@ -80,4 +80,3 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
-
