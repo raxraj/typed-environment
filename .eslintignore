@@ -1,3 +1,4 @@
 build
 dist
 jest.config.ts
+coverage
