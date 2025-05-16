@@ -134,7 +134,7 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
     value: string | undefined,
   ): void {
     const numValue = value !== undefined ? Number(value) : field.default;
-    if (numValue && isNaN(numValue)) {
+    if (numValue !== undefined && isNaN(numValue)) {
       throw new InvalidTypeError(key, 'number', value);
     }
     this.parsedEnvironment[key] = numValue;
