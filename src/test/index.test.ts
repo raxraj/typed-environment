@@ -12,10 +12,12 @@ describe('TypedEnv Class', () => {
 
     // Simulate loading environment variables
     env.configEnvironment('src/test/mock.env');
+    env.parse(env['environment'], schema);
 
     // Assertions
     expect(env['environment'].TEST_STRING).toBe('example');
     expect(env['environment'].TEST_NUMBER).toBe('42');
+    expect(env['parsedEnvironment'].TEST_NUMBER).toBe(42);
   });
 
   it('should throw MissingRequiredFieldError if a required field is missing', () => {
