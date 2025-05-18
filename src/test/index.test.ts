@@ -123,7 +123,7 @@ describe('TypedEnv Class', () => {
     expect(env['parsedEnvironment'].TEST_BOOLEAN).toBe(true);
   });
 
-  it('should through invalid boolean error', () => {
+  it('should throw invalid boolean error', () => {
     const schema: EnvSchema = {
       TEST_STRING: {type: 'boolean', required: true},
     };
