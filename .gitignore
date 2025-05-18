@@ -3,4 +3,5 @@ dist
 build
 .idea
 coverage
+tsconfig.tsbuildinfotsconfig.tsbuildinfo
 tsconfig.tsbuildinfo
