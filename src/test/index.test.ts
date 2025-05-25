@@ -33,6 +33,7 @@ describe('File Parsing', () => {
 
     const env = new TypedEnv(schema);
     env.configEnvironment('.env.test');
+
     const result = env.init();
 
     expect(result.QUOTED_VALUE).toBe('hello world');
@@ -128,6 +129,7 @@ describe('TypedEnv Class', () => {
       TEST_STRING: {type: 'boolean', required: true},
     };
     const env = new TypedEnv(schema);
+
     env.configEnvironment('src/test/mock.env');
 
     expect(() => {
@@ -157,7 +159,7 @@ describe('TypedEnv Class', () => {
   it('should throw UnsupportedTypeError for invalid schema type', () => {
     const schema = {
       // @eslint-disable-next-line @typescript-eslint/no-explicit-any
-      INVALID_TYPE: {type: 'Object' as any, required: true},
+      INVALID_TYPE: {type: 'Object' as never, required: true},
     };
 
     const env = new TypedEnv(schema);
