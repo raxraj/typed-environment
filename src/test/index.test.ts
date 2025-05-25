@@ -169,6 +169,30 @@ describe('TypedEnv Class', () => {
       UnsupportedTypeError,
     );
   });
+
+  it('should use default value for number field when value is undefined', () => {
+    const schema: EnvSchema = {
+      NUMBER_WITH_DEFAULT: {type: 'number', default: 42, required: false},
+    };
+
+    const env = new TypedEnv(schema);
+    env['environment'] = {}; // Empty environment, so NUMBER_WITH_DEFAULT is undefined
+
+    env.parse(env['environment'], schema);
+    expect(env['parsedEnvironment'].NUMBER_WITH_DEFAULT).toBe(42);
+  });
+
+  it('should use default value for boolean field when value is undefined', () => {
+    const schema: EnvSchema = {
+      BOOLEAN_WITH_DEFAULT: {type: 'boolean', default: true, required: false},
+    };
+
+    const env = new TypedEnv(schema);
+    env['environment'] = {}; // Empty environment, so BOOLEAN_WITH_DEFAULT is undefined
+
+    env.parse(env['environment'], schema);
+    expect(env['parsedEnvironment'].BOOLEAN_WITH_DEFAULT).toBe(true);
+  });
 });
 
 describe('Integration Tests', () => {

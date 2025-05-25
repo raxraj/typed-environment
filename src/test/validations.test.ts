@@ -113,6 +113,21 @@ describe('Enhanced Validation Tests', () => {
         CustomValidationError,
       );
     });
+
+    it('should handle for undefined values with extra validations', () => {
+      const schema: EnvSchema = {
+        OPTIONAL_STRING: {type: 'string', required: false, minLength: 3},
+      };
+      const env = new TypedEnv(schema);
+
+      // Valid case with undefined
+      env.parse({}, schema);
+      expect(env['parsedEnvironment'].OPTIONAL_STRING).toBeUndefined();
+
+      // Valid case with defined value
+      env.parse({OPTIONAL_STRING: 'defined'}, schema);
+      expect(env['parsedEnvironment'].OPTIONAL_STRING).toBe('defined');
+    });
   });
 
   describe('Number Validations', () => {
