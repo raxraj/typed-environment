@@ -3,7 +3,26 @@ export type BaseField<Type extends 'string' | 'number' | 'boolean', T> = {
   default?: T;
   required?: boolean;
   choices?: readonly T[];
-};
+} & (Type extends 'string'
+  ? {
+      minLength?: number;
+      maxLength?: number;
+      pattern?: RegExp | string;
+      customValidator?: (value: string) => boolean;
+    }
+  : {}) &
+  (Type extends 'number'
+    ? {
+        min?: number;
+        max?: number;
+        customValidator?: (value: number) => boolean;
+      }
+    : {}) &
+  (Type extends 'boolean'
+    ? {
+        customValidator?: (value: boolean) => boolean;
+      }
+    : {});
 
 export type EnvSchema = {
   [key: string]:

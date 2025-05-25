@@ -7,6 +7,10 @@ import {
   InvalidTypeError,
   MissingRequiredFieldError,
   UnsupportedTypeError,
+  InvalidStringLengthError,
+  InvalidPatternError,
+  InvalidNumberRangeError,
+  CustomValidationError,
 } from './utils/envError';
 
 export default class TypedEnv<S extends EnvSchema> extends Error {
@@ -87,6 +91,7 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
       this.validateRequiredField<string | number | boolean>(key, field, value);
       this.parseAndSetValue<string | number | boolean>(key, field, value);
       this.validateEnumChoices<string | number | boolean>(key, field);
+      this.validateAdvancedConstraints(key, field);
     }
   }
 
@@ -165,6 +170,126 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
         field.choices as readonly (string | number | boolean)[],
         this.parsedEnvironment[key],
       );
+    }
+  }
+
+  private validateAdvancedConstraints(
+    key: string,
+    field: BaseField<
+      'string' | 'number' | 'boolean',
+      string | number | boolean
+    >,
+  ): void {
+    const value = this.parsedEnvironment[key];
+
+    // Skip validation if value is undefined (handled by required field validation)
+    if (value === undefined) {
+      return;
+    }
+
+    switch (field.type) {
+      case 'string':
+        this.validateStringConstraints(
+          key,
+          field as BaseField<'string', string>,
+          value as string,
+        );
+        break;
+      case 'number':
+        this.validateNumberConstraints(
+          key,
+          field as BaseField<'number', number>,
+          value as number,
+        );
+        break;
+      case 'boolean':
+        this.validateBooleanConstraints(
+          key,
+          field as BaseField<'boolean', boolean>,
+          value as boolean,
+        );
+        break;
+    }
+  }
+
+  private validateStringConstraints(
+    key: string,
+    field: BaseField<'string', string> & {
+      minLength?: number;
+      maxLength?: number;
+      pattern?: RegExp | string;
+      customValidator?: (value: string) => boolean;
+    },
+    value: string,
+  ): void {
+    // Length validation
+    if (field.minLength !== undefined && value.length < field.minLength) {
+      throw new InvalidStringLengthError(
+        key,
+        value,
+        field.minLength,
+        field.maxLength,
+      );
+    }
+    if (field.maxLength !== undefined && value.length > field.maxLength) {
+      throw new InvalidStringLengthError(
+        key,
+        value,
+        field.minLength,
+        field.maxLength,
+      );
+    }
+
+    // Pattern validation
+    if (field.pattern !== undefined) {
+      const regex =
+        typeof field.pattern === 'string'
+          ? new RegExp(field.pattern)
+          : field.pattern;
+      if (!regex.test(value)) {
+        throw new InvalidPatternError(key, field.pattern, value);
+      }
+    }
+
+    // Custom validation
+    if (field.customValidator && !field.customValidator(value)) {
+      throw new CustomValidationError(key, value);
+    }
+  }
+
+  private validateNumberConstraints(
+    key: string,
+    field: BaseField<'number', number> & {
+      min?: number;
+      max?: number;
+      customValidator?: (value: number) => boolean;
+    },
+    value: number,
+  ): void {
+    // Range validation
+    if (field.min !== undefined && value < field.min) {
+      throw new InvalidNumberRangeError(key, value, field.min, field.max);
+    }
+    if (field.max !== undefined && value > field.max) {
+      throw new InvalidNumberRangeError(key, value, field.min, field.max);
+    }
+
+    // Custom validation
+    if (field.customValidator && !field.customValidator(value)) {
+      throw new CustomValidationError(key, value);
+    }
+  }
+
+  private validateBooleanConstraints(
+    key: string,
+    field: BaseField<'boolean', boolean> & {
+      customValidator?: (value: boolean) => boolean;
+    },
+    value: boolean,
+  ): void {
+    // Custom validation
+    if (field.customValidator && !field.customValidator(value)) {
+      throw new CustomValidationError(key, value);
     }
   }
 

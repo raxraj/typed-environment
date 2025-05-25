@@ -33,6 +33,7 @@ describe('File Parsing', () => {
 
     const env = new TypedEnv(schema);
     env.configEnvironment('.env.test');
+
     const result = env.init();
 
     expect(result.QUOTED_VALUE).toBe('hello world');
@@ -128,6 +129,7 @@ describe('TypedEnv Class', () => {
       TEST_STRING: {type: 'boolean', required: true},
     };
     const env = new TypedEnv(schema);
+
     env.configEnvironment('src/test/mock.env');
 
     expect(() => {
@@ -157,7 +159,7 @@ describe('TypedEnv Class', () => {
   it('should throw UnsupportedTypeError for invalid schema type', () => {
     const schema = {
       // @eslint-disable-next-line @typescript-eslint/no-explicit-any
-      INVALID_TYPE: {type: 'Object' as any, required: true},
+      INVALID_TYPE: {type: 'Object' as never, required: true},
     };
 
     const env = new TypedEnv(schema);
@@ -166,6 +168,30 @@ describe('TypedEnv Class', () => {
     expect(() => env.parse(env['environment'], schema)).toThrow(
       UnsupportedTypeError,
     );
+  });
+
+  it('should use default value for number field when value is undefined', () => {
+    const schema: EnvSchema = {
+      NUMBER_WITH_DEFAULT: {type: 'number', default: 42, required: false},
+    };
+
+    const env = new TypedEnv(schema);
+    env['environment'] = {}; // Empty environment, so NUMBER_WITH_DEFAULT is undefined
+
+    env.parse(env['environment'], schema);
+    expect(env['parsedEnvironment'].NUMBER_WITH_DEFAULT).toBe(42);
+  });
+
+  it('should use default value for boolean field when value is undefined', () => {
+    const schema: EnvSchema = {
+      BOOLEAN_WITH_DEFAULT: {type: 'boolean', default: true, required: false},
+    };
+
+    const env = new TypedEnv(schema);
+    env['environment'] = {}; // Empty environment, so BOOLEAN_WITH_DEFAULT is undefined
+
+    env.parse(env['environment'], schema);
+    expect(env['parsedEnvironment'].BOOLEAN_WITH_DEFAULT).toBe(true);
   });
 });
 

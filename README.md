@@ -1,6 +1,6 @@
-# typed-env
+# typed-environment
 
-A strongly typed environment variable manager for TypeScript applications.
+A zero-dependency, TypeScript-native library to load and validate environment variables using a custom schema with advanced validation capabilities.
 
 ## Overview
 
@@ -14,6 +14,7 @@ A strongly typed environment variable manager for TypeScript applications.
 - 📝 **Documentation**: Self-documenting environment requirements
 - 🏷️ **Default Values**: Specify default values for optional variables
 - 🔍 **Error Handling**: Clear error messages for missing or invalid environment variables
+- 🎯 **Advanced Validations**: String patterns, length limits, number ranges, and custom validators
 
 ## Installation
 
@@ -23,46 +24,178 @@ npm install typed-environment
 yarn add typed-environment
 ```
 
-## Usage
-
-### Basic Example
+## Basic Usage
 
 ```typescript
 import TypedEnv from 'typed-environment';
 
-const environmentSchema = {
-  PORT: {
-    type: 'number',
-    default: 8090,
+const schema = {
+  DATABASE_URL: { type: 'string', required: true },
+  PORT: { type: 'number', default: 3000 },
+  DEBUG: { type: 'boolean', default: false },
+  NODE_ENV: { 
+    type: 'string', 
+    required: true, 
+    choices: ['development', 'production', 'test'] 
   },
-  SECRET_KEY: {
-    type: 'string',
-    required: true,
-  },
-};
-const typedEnv = new TypedEnv(environmentSchema);
+} as const;
 
-const env = typedEnv.init();
+const env = new TypedEnv(schema);
+const config = env.init();
+
+// config is fully typed!
+console.log(config.DATABASE_URL); // string
+console.log(config.PORT);         // number
+console.log(config.DEBUG);        // boolean
+console.log(config.NODE_ENV);     // 'development' | 'production' | 'test'
 ```
 
-### Handling Missing Variables
+## Advanced Validation Features
 
-The library will throw detailed errors when required variables are missing or values don't match the expected type:
+### String Validation
 
 ```typescript
-try {
-  const env = typedEnv.init();
-} catch (error) {
-  console.error('Environment configuration error:', error.message);
-  // Example: "Environment variable "API_KEY" is required but is missing."
-}
+const schema = {
+  // Length constraints
+  USERNAME: {
+    type: 'string',
+    required: true,
+    minLength: 3,
+    maxLength: 20
+  },
+
+  // Pattern validation with regex
+  EMAIL: {
+    type: 'string',
+    required: true,
+    pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  },
+
+  // Pattern validation with string regex
+  API_KEY: {
+    type: 'string',
+    required: true,
+    pattern: '^[a-zA-Z0-9]{32}$'
+  },
+
+  // Custom validation function
+  CUSTOM_FIELD: {
+    type: 'string',
+    required: true,
+    customValidator: (value: string) => value.startsWith('prefix_')
+  }
+} as const;
 ```
 
-### Supported Types
+### Number Validation
 
-- `string()`: String values
-- `number()`: Numeric values
-- `boolean()`: Boolean values (supports "true"/"false" strings)
+```typescript
+const schema = {
+  // Range validation
+  PORT: {
+    type: 'number',
+    required: true,
+    min: 1000,
+    max: 65535
+  },
+
+  // Custom validation for numbers
+  WORKER_COUNT: {
+    type: 'number',
+    required: true,
+    min: 1,
+    customValidator: (value: number) => value <= require('os').cpus().length
+  }
+} as const;
+```
+
+### Boolean Validation
+
+```typescript
+const schema = {
+  // Custom boolean validation
+  ENABLE_FEATURE: {
+    type: 'boolean',
+    required: true,
+    customValidator: (value: boolean) => {
+      // Only allow true in production
+      return process.env.NODE_ENV !== 'production' || value === true;
+    }
+  }
+} as const;
+```
+
+### Real-World Example
+
+```typescript
+import TypedEnv from 'typed-environment';
+
+const schema = {
+  // Database configuration
+  DATABASE_URL: {
+    type: 'string',
+    required: true,
+    pattern: /^postgresql:\/\/.+/,
+  },
+
+  // Server configuration
+  PORT: {
+    type: 'number',
+    default: 3000,
+    min: 1000,
+    max: 65535,
+  },
+
+  // Security
+  JWT_SECRET: {
+    type: 'string',
+    required: true,
+    minLength: 32,
+    pattern: /^[a-zA-Z0-9+/=]+$/,
+  },
+
+  // Feature flags
+  ENABLE_LOGGING: {
+    type: 'boolean',
+    default: true,
+  },
+
+  // Environment
+  NODE_ENV: {
+    type: 'string',
+    required: true,
+    choices: ['development', 'staging', 'production'],
+  },
+
+  // Rate limiting
+  RATE_LIMIT: {
+    type: 'number',
+    default: 100,
+    min: 1,
+    max: 10000,
+    customValidator: (value: number) => value % 10 === 0, // Must be multiple of 10
+  },
+} as const;
+
+const env = new TypedEnv(schema);
+const config = env.init();
+
+// All values are properly typed and validated!
+```
+
+## Validation Types
+
+| Validation Type | Supported Types | Description |
+|----------------|----------------|-------------|
+| `required` | all | Field must be present |
+| `default` | all | Default value if not provided |
+| `choices` | all | Enum validation |
+| `minLength` | string | Minimum string length |
+| `maxLength` | string | Maximum string length |
+| `pattern` | string | Regex pattern matching |
+| `min` | number | Minimum numeric value |
+| `max` | number | Maximum numeric value |
+| `customValidator` | all | Custom validation function |
 
 ## Error Handling
 
@@ -72,6 +205,23 @@ The library provides specific error types for different validation issues:
 - `InvalidTypeError`: When a value can't be converted to the expected type
 - `InvalidBooleanError`: When a value can't be parsed as a boolean
 - `InvalidEnumError`: When a value is not one of the allowed choices
+- `InvalidStringLengthError`: When a string doesn't meet length requirements
+- `InvalidPatternError`: When a string doesn't match the required pattern
+- `InvalidNumberRangeError`: When a number is outside the allowed range
+- `CustomValidationError`: When custom validation fails
+
+```typescript
+try {
+  const config = env.init();
+} catch (error) {
+  if (error instanceof MissingRequiredFieldError) {
+    console.error(`Missing required field: ${error.message}`);
+  } else if (error instanceof InvalidPatternError) {
+    console.error(`Pattern validation failed: ${error.message}`);
+  }
+  // Handle other error types...
+}
+```
 
 ## Contributing
 
