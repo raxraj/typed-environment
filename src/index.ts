@@ -298,4 +298,12 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
     this.parse(this.environment, this.schema);
     return this.parsedEnvironment as InferSchema<S>;
   }
+
+  public getEnvironment(): {[key: string]: string} {
+    return this.environment;
+  }
+
+  public getParsedEnvironment(): {[key: string]: string | number | boolean | undefined} {
+    return this.parsedEnvironment;
+  }
 }
