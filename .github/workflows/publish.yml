@@ -1,30 +1,92 @@
-name: Publish Package to npm
+name: Version Bump and Publish
 
 on:
-    push:
-        branches:
-            - main
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'package.json'
+      - 'CHANGELOG.md'
 
 jobs:
-    build-and-publish:
-        runs-on: ubuntu-latest
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
+  version-bump:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version_bumped: ${{ steps.version-bump.outputs.version_bumped }}
 
-            - name: Setup Node.js
-              uses: actions/setup-node@v4
-              with:
-                  node-version: '20'
-                  registry-url: 'https://registry.npmjs.org'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-            - name: Install dependencies
-              run: npm ci
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
 
-            - name: Run linting
-              run: npm run lint
+      - name: Install dependencies
+        run: npm ci
 
-            - name: Publish to npm
-              run: npm publish
-              env:
-                  NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Configure Git
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+      - name: Run version bump and generate changelog
+        id: version-bump
+        run: |
+          # Check if this commit was triggered by the version bump automation
+          if git log -1 --pretty=%B | grep -q "chore(release):"; then
+            echo "This is a version bump commit, skipping"
+            echo "version_bumped=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Install standard-version for version bumping and changelog generation
+          npm install -g standard-version
+
+          # Run version bump and update changelog
+          standard-version
+
+          # Get the new version
+          NEW_VERSION=$(node -e "console.log(require('./package.json').version)")
+          
+          # Commit and push changes
+          git push --follow-tags origin main
+          
+          echo "version_bumped=true" >> $GITHUB_OUTPUT
+          echo "New version: $NEW_VERSION"
+
+  publish:
+    needs: version-bump
+    if: needs.version-bump.outputs.version_bumped == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: main # Ensure we have the latest commit with version bump
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
+
+      - name: Publish to NPM
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
