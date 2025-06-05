@@ -303,7 +303,9 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
     return Object.freeze(this.environment);
   }
 
-  public getParsedEnvironment(): {[key: string]: string | number | boolean | undefined} {
+  public getParsedEnvironment(): {
+    [key: string]: string | number | boolean | undefined;
+  } {
     return Object.freeze(this.parsedEnvironment);
   }
 }
