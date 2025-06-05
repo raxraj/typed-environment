@@ -50,8 +50,8 @@ describe('File Parsing', () => {
     const env = new TypedEnv(schema);
     env.configEnvironment('.env.test');
 
-    expect(env['environment'].VALID_KEY).toBe('value');
-    expect(Object.keys(env['environment']).length).toBe(1);
+    expect(env.getEnvironment().VALID_KEY).toBe('value');
+    expect(Object.keys(env.getEnvironment()).length).toBe(1);
   });
 
   it('should handle non-existent env file gracefully', () => {
@@ -82,13 +82,13 @@ describe('TypedEnv Class', () => {
 
     // Simulate loading environment variables
     env.configEnvironment('src/test/mock.env');
-    env.parse(env['environment'], schema);
+    env.parse(env.getEnvironment(), schema);
 
     // Assertions
-    expect(env['environment'].TEST_STRING).toBe('example');
-    expect(env['environment'].TEST_NUMBER).toBe('42');
-    expect(env['environment'].TEST_COMMENT).toBeUndefined();
-    expect(env['parsedEnvironment'].TEST_NUMBER).toBe(42);
+    expect(env.getEnvironment().TEST_STRING).toBe('example');
+    expect(env.getEnvironment().TEST_NUMBER).toBe('42');
+    expect(env.getEnvironment().TEST_COMMENT).toBeUndefined();
+    expect(env.getParsedEnvironment().TEST_NUMBER).toBe(42);
   });
 
   it('should throw MissingRequiredFieldError if a required field is missing', () => {
@@ -120,8 +120,8 @@ describe('TypedEnv Class', () => {
     const env = new TypedEnv(schema);
 
     env.configEnvironment('src/test/mock.env');
-    env.parse(env['environment'], schema);
-    expect(env['parsedEnvironment'].TEST_BOOLEAN).toBe(true);
+    env.parse(env.getEnvironment(), schema);
+    expect(env.getParsedEnvironment().TEST_BOOLEAN).toBe(true);
   });
 
   it('should throw invalid boolean error', () => {
@@ -133,7 +133,7 @@ describe('TypedEnv Class', () => {
     env.configEnvironment('src/test/mock.env');
 
     expect(() => {
-      env.parse(env['environment'], schema);
+      env.parse(env.getEnvironment(), schema);
     }).toThrow(InvalidBooleanError);
   });
 

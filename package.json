@@ -1,6 +1,6 @@
 {
     "name": "typed-environment",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "description": "typed-environment is a zero-dependency, TypeScript-native library to load and validate environment variables using a custom schema. Get fully typed, safe, and reliable config objects with ease.",
     "license": "MIT",
     "author": "Ashutosh Kumar",
