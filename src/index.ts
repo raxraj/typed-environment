@@ -300,10 +300,10 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
   }
 
   public getEnvironment(): {[key: string]: string} {
-    return this.environment;
+    return Object.freeze(this.environment);
   }
 
   public getParsedEnvironment(): {[key: string]: string | number | boolean | undefined} {
-    return this.parsedEnvironment;
+    return Object.freeze(this.parsedEnvironment);
   }
 }
