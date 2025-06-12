@@ -38,19 +38,21 @@ type TypeMap = {
 };
 
 // Inference logic
+// Infer the value type from choices if present, otherwise use TypeMap
+export type InferFieldType<F> = F extends {choices: readonly (infer C)[]}
+  ? C
+  : F extends {type: infer T}
+    ? T extends keyof TypeMap
+      ? TypeMap[T]
+      : never
+    : never;
+
 export type InferSchema<T extends EnvSchema> = {
-  [K in keyof T as T[K] extends {required: true}
-    ? K
-    : never]: T[K] extends BaseField<
-    infer Type,
-    'string' | 'number' | 'boolean'
-  >
-    ? TypeMap[Type]
-    : never;
+  [K in keyof T as T[K] extends {required: true} ? K : never]: InferFieldType<
+    T[K]
+  >;
 } & {
-  [K in keyof T as T[K] extends {required: true}
-    ? never
-    : K]?: T[K] extends BaseField<infer Type, 'string' | 'number' | 'boolean'>
-    ? TypeMap[Type]
-    : never;
+  [K in keyof T as T[K] extends {required: true} ? never : K]?: InferFieldType<
+    T[K]
+  >;
 };
