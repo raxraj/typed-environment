@@ -37,20 +37,29 @@ type TypeMap = {
   boolean: boolean;
 };
 
+// Helper type to determine if a field is required (either explicitly required or has a default value)
+type IsRequired<T> = T extends {required: true}
+  ? true
+  : T extends {default: any}
+    ? true
+    : false;
+
+// Helper type to infer the correct field type, including choices
+type InferFieldType<T> = T extends BaseField<any, any> & {
+  choices: readonly (infer Choice)[];
+}
+  ? Choice
+  : T extends BaseField<infer Type, any>
+    ? TypeMap[Type]
+    : never;
+
 // Inference logic
 export type InferSchema<T extends EnvSchema> = {
-  [K in keyof T as T[K] extends {required: true}
-    ? K
-    : never]: T[K] extends BaseField<
-    infer Type,
-    'string' | 'number' | 'boolean'
-  >
-    ? TypeMap[Type]
-    : never;
+  [K in keyof T as IsRequired<T[K]> extends true ? K : never]: InferFieldType<
+    T[K]
+  >;
 } & {
-  [K in keyof T as T[K] extends {required: true}
-    ? never
-    : K]?: T[K] extends BaseField<infer Type, 'string' | 'number' | 'boolean'>
-    ? TypeMap[Type]
-    : never;
+  [K in keyof T as IsRequired<T[K]> extends true ? never : K]?: InferFieldType<
+    T[K]
+  >;
 };

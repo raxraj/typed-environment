@@ -100,7 +100,7 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
     field: BaseField<'string' | 'number' | 'boolean', T>,
     value: string | undefined,
   ): void {
-    if (value === undefined && field.required) {
+    if (value === undefined && field.required && field.default === undefined) {
       throw new MissingRequiredFieldError(key);
     }
   }
