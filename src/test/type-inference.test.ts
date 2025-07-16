@@ -1,27 +1,27 @@
 import TypedEnv from '../index';
-import { InferSchema } from '../types';
+import {InferSchema} from '../types';
 
 describe('Type Inference Tests', () => {
   it('should infer correct types for required and optional fields', () => {
     const schema = {
-      REQUIRED_STRING: { type: 'string', required: true },
-      OPTIONAL_STRING: { type: 'string', required: false },
-      STRING_WITH_DEFAULT: { type: 'string', default: 'default' },
-      REQUIRED_NUMBER: { type: 'number', required: true },
-      OPTIONAL_NUMBER: { type: 'number', required: false },
-      NUMBER_WITH_DEFAULT: { type: 'number', default: 42 },
-      REQUIRED_BOOLEAN: { type: 'boolean', required: true },
-      OPTIONAL_BOOLEAN: { type: 'boolean', required: false },
-      BOOLEAN_WITH_DEFAULT: { type: 'boolean', default: true },
-      CHOICES_STRING: { 
-        type: 'string', 
-        required: true, 
-        choices: ['option1', 'option2', 'option3'] 
+      REQUIRED_STRING: {type: 'string', required: true},
+      OPTIONAL_STRING: {type: 'string', required: false},
+      STRING_WITH_DEFAULT: {type: 'string', default: 'default'},
+      REQUIRED_NUMBER: {type: 'number', required: true},
+      OPTIONAL_NUMBER: {type: 'number', required: false},
+      NUMBER_WITH_DEFAULT: {type: 'number', default: 42},
+      REQUIRED_BOOLEAN: {type: 'boolean', required: true},
+      OPTIONAL_BOOLEAN: {type: 'boolean', required: false},
+      BOOLEAN_WITH_DEFAULT: {type: 'boolean', default: true},
+      CHOICES_STRING: {
+        type: 'string',
+        required: true,
+        choices: ['option1', 'option2', 'option3'],
       },
     } as const;
 
     const env = new TypedEnv(schema);
-    
+
     // Mock environment to ensure we get proper values
     env['environment'] = {
       REQUIRED_STRING: 'test',
@@ -37,16 +37,27 @@ describe('Type Inference Tests', () => {
 
     // Type assertions to validate inference
     // These should compile without errors if types are correct
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const requiredString: string = config.REQUIRED_STRING;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const optionalString: string | undefined = config.OPTIONAL_STRING;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const stringWithDefault: string = config.STRING_WITH_DEFAULT;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const requiredNumber: number = config.REQUIRED_NUMBER;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const optionalNumber: number | undefined = config.OPTIONAL_NUMBER;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const numberWithDefault: number = config.NUMBER_WITH_DEFAULT;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const requiredBoolean: boolean = config.REQUIRED_BOOLEAN;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const optionalBoolean: boolean | undefined = config.OPTIONAL_BOOLEAN;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const booleanWithDefault: boolean = config.BOOLEAN_WITH_DEFAULT;
-    const choicesString: 'option1' | 'option2' | 'option3' = config.CHOICES_STRING;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const choicesString: 'option1' | 'option2' | 'option3' =
+      config.CHOICES_STRING;
 
     // Actual runtime checks
     expect(typeof config.REQUIRED_STRING).toBe('string');
@@ -75,24 +86,26 @@ describe('Type Inference Tests', () => {
 
   it('should properly type required vs optional fields', () => {
     const schema = {
-      REQUIRED_FIELD: { type: 'string', required: true },
-      OPTIONAL_FIELD: { type: 'string', required: false },
-      DEFAULT_FIELD: { type: 'string', default: 'default' },
+      REQUIRED_FIELD: {type: 'string', required: true},
+      OPTIONAL_FIELD: {type: 'string', required: false},
+      DEFAULT_FIELD: {type: 'string', default: 'default'},
     } as const;
 
     type InferredType = InferSchema<typeof schema>;
-    
+
     // This function helps verify compile-time types
     function checkTypes(config: InferredType) {
       // Required field should be non-optional
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const required: string = config.REQUIRED_FIELD;
-      
+
       // Optional field should be optional
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const optional: string | undefined = config.OPTIONAL_FIELD;
-      
+
       // Field with default should be non-optional
       const withDefault: string = config.DEFAULT_FIELD;
-      
+
       expect(typeof required).toBe('string');
       expect(typeof withDefault).toBe('string');
       // optional could be string or undefined
@@ -103,10 +116,10 @@ describe('Type Inference Tests', () => {
       REQUIRED_FIELD: 'required_value',
       OPTIONAL_FIELD: 'optional_value',
     };
-    
+
     const config = env.init();
     checkTypes(config);
-    
+
     expect(config.REQUIRED_FIELD).toBe('required_value');
     expect(config.OPTIONAL_FIELD).toBe('optional_value');
     expect(config.DEFAULT_FIELD).toBe('default');
