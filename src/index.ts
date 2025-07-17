@@ -1,4 +1,10 @@
-import {BaseField, EnvSchema, InferSchema} from './types';
+import {
+  BaseField,
+  EnvSchema,
+  InferSchema,
+  NormalizeField,
+  ShorthandField,
+} from './types';
 import * as path from 'path';
 import * as fs from 'fs';
 import {
@@ -23,6 +29,64 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
   constructor(schema: S) {
     super();
     this.schema = schema;
+  }
+
+  private normalizeField(
+    field: BaseField<'string' | 'number' | 'boolean', any> | ShorthandField,
+  ): BaseField<'string' | 'number' | 'boolean', any> {
+    // If it's already a full BaseField, return as is
+    if (typeof field === 'object' && field !== null && 'type' in field) {
+      return field;
+    }
+
+    // Handle shorthand formats
+    if (typeof field === 'string') {
+      return {type: 'string', default: field};
+    }
+
+    if (typeof field === 'number') {
+      return {type: 'number', default: field};
+    }
+
+    if (typeof field === 'boolean') {
+      return {type: 'boolean', default: field};
+    }
+
+    // Handle { required: true } format
+    if (typeof field === 'object' && field !== null && 'required' in field) {
+      if ('choices' in field && field.choices) {
+        const choices = field.choices as readonly (string | number | boolean)[];
+        const firstChoice = choices[0];
+
+        if (typeof firstChoice === 'string') {
+          return {
+            type: 'string',
+            required: true,
+            choices: choices as readonly string[],
+          };
+        }
+        if (typeof firstChoice === 'number') {
+          return {
+            type: 'number',
+            required: true,
+            choices: choices as readonly number[],
+          };
+        }
+        if (typeof firstChoice === 'boolean') {
+          return {
+            type: 'boolean',
+            required: true,
+            choices: choices as readonly boolean[],
+          };
+        }
+      }
+
+      // Default to string for required fields without choices
+      return {type: 'string', required: true};
+    }
+
+    // Fallback - should not happen with proper typing
+    throw new Error('Invalid field format');
   }
 
   private parseLine(line: string): {key: string; value: string} | null {
@@ -85,7 +149,8 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
 
   parse(environment: {[key: string]: string}, schema: EnvSchema) {
     for (const key in schema) {
-      const field = schema[key];
+      const originalField = schema[key];
+      const field = this.normalizeField(originalField);
       const value = environment[key];
 
       this.validateRequiredField<string | number | boolean>(key, field, value);
