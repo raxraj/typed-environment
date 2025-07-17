@@ -223,6 +223,10 @@ try {
 }
 ```
 
+## API Reference
+
+For detailed API documentation, see the [API Reference](API.md).
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
