@@ -1,4 +1,7 @@
-export type BaseField<Type extends 'string' | 'number' | 'boolean', T> = {
+export type BaseField<
+  Type extends 'string' | 'number' | 'boolean' | 'object',
+  T,
+> = {
   type: Type;
   default?: T;
   required?: boolean;
@@ -22,19 +25,26 @@ export type BaseField<Type extends 'string' | 'number' | 'boolean', T> = {
     ? {
         customValidator?: (value: boolean) => boolean;
       }
+    : {}) &
+  (Type extends 'object'
+    ? {
+        customValidator?: (value: object) => boolean;
+      }
     : {});
 
 export type EnvSchema = {
   [key: string]:
     | BaseField<'string', string>
     | BaseField<'number', number>
-    | BaseField<'boolean', boolean>;
+    | BaseField<'boolean', boolean>
+    | BaseField<'object', object>;
 };
 
 type TypeMap = {
   string: string;
   number: number;
   boolean: boolean;
+  object: object;
 };
 
 // Helper type to determine if a field is required (either explicitly required or has a default value)

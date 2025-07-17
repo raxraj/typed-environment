@@ -33,11 +33,11 @@ export class InvalidBooleanError extends EnvError {
 export class InvalidEnumError extends EnvError {
   constructor(
     field: string,
-    allowedValues: readonly (string | number | boolean)[],
+    allowedValues: readonly (string | number | boolean | object)[],
     receivedValue: unknown,
   ) {
     super(
-      `Environment variable "${field}" must be one of [${allowedValues.join(', ')}], but received "${receivedValue}".`,
+      `Environment variable "${field}" must be one of [${allowedValues.map(v => (typeof v === 'object' ? JSON.stringify(v) : v)).join(', ')}], but received "${typeof receivedValue === 'object' ? JSON.stringify(receivedValue) : receivedValue}".`,
     );
     this.name = 'InvalidEnumError';
   }
@@ -95,5 +95,14 @@ export class CustomValidationError extends EnvError {
       `Environment variable "${field}" failed custom validation with value "${value}".`,
     );
     this.name = 'CustomValidationError';
+  }
+}
+
+export class InvalidJSONError extends EnvError {
+  constructor(field: string, value: string, originalError: string) {
+    super(
+      `Environment variable "${field}" must be valid JSON, but received "${value}". Error: ${originalError}`,
+    );
+    this.name = 'InvalidJSONError';
   }
 }

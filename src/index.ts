@@ -11,13 +11,14 @@ import {
   InvalidPatternError,
   InvalidNumberRangeError,
   CustomValidationError,
+  InvalidJSONError,
 } from './utils/envError';
 
 export default class TypedEnv<S extends EnvSchema> extends Error {
   schema: S;
   private environment: {[key: string]: string} = {};
   private parsedEnvironment: {
-    [key: string]: string | number | boolean | undefined;
+    [key: string]: string | number | boolean | object | undefined;
   } = {};
 
   constructor(schema: S) {
@@ -88,16 +89,24 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
       const field = schema[key];
       const value = environment[key];
 
-      this.validateRequiredField<string | number | boolean>(key, field, value);
-      this.parseAndSetValue<string | number | boolean>(key, field, value);
-      this.validateEnumChoices<string | number | boolean>(key, field);
+      this.validateRequiredField<string | number | boolean | object>(
+        key,
+        field,
+        value,
+      );
+      this.parseAndSetValue<string | number | boolean | object>(
+        key,
+        field,
+        value,
+      );
+      this.validateEnumChoices<string | number | boolean | object>(key, field);
       this.validateAdvancedConstraints(key, field);
     }
   }
 
   private validateRequiredField<T>(
     key: string,
-    field: BaseField<'string' | 'number' | 'boolean', T>,
+    field: BaseField<'string' | 'number' | 'boolean' | 'object', T>,
     value: string | undefined,
   ): void {
     if (value === undefined && field.required && field.default === undefined) {
@@ -107,7 +116,7 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
 
   private parseAndSetValue<T>(
     key: string,
-    field: BaseField<'string' | 'number' | 'boolean', T>,
+    field: BaseField<'string' | 'number' | 'boolean' | 'object', T>,
     value: string | undefined,
   ): void {
     switch (field.type) {
@@ -119,6 +128,9 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
         break;
       case 'boolean':
         this.parseBoolean(key, field as BaseField<'boolean', boolean>, value);
+        break;
+      case 'object':
+        this.parseObject(key, field as BaseField<'object', object>, value);
         break;
       default:
         throw new UnsupportedTypeError(field.type);
@@ -157,27 +169,51 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
       value !== undefined ? value.toLowerCase() === 'true' : field.default;
   }
 
+  private parseObject(
+    key: string,
+    field: BaseField<'object', object>,
+    value: string | undefined,
+  ): void {
+    if (value !== undefined) {
+      try {
+        this.parsedEnvironment[key] = JSON.parse(value);
+      } catch (error) {
+        throw new InvalidJSONError(key, value, (error as Error).message);
+      }
+    } else {
+      this.parsedEnvironment[key] = field.default;
+    }
+  }
+
   private validateEnumChoices<T>(
     key: string,
-    field: BaseField<'string' | 'number' | 'boolean', T>,
+    field: BaseField<'string' | 'number' | 'boolean' | 'object', T>,
   ): void {
-    if (
-      field.choices &&
-      !field.choices.find(choice => choice === this.parsedEnvironment[key])
-    ) {
-      throw new InvalidEnumError(
-        key,
-        field.choices as readonly (string | number | boolean)[],
-        this.parsedEnvironment[key],
-      );
+    if (field.choices && field.choices.length > 0) {
+      const value = this.parsedEnvironment[key];
+      const isValid = field.choices.find(choice => {
+        if (field.type === 'object') {
+          // For objects, use deep equality comparison
+          return JSON.stringify(choice) === JSON.stringify(value);
+        }
+        return choice === value;
+      });
+
+      if (!isValid) {
+        throw new InvalidEnumError(
+          key,
+          field.choices as readonly (string | number | boolean | object)[],
+          this.parsedEnvironment[key],
+        );
+      }
     }
   }
 
   private validateAdvancedConstraints(
     key: string,
     field: BaseField<
-      'string' | 'number' | 'boolean',
-      string | number | boolean
+      'string' | 'number' | 'boolean' | 'object',
+      string | number | boolean | object
     >,
   ): void {
     const value = this.parsedEnvironment[key];
@@ -207,6 +243,13 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
           key,
           field as BaseField<'boolean', boolean>,
           value as boolean,
+        );
+        break;
+      case 'object':
+        this.validateObjectConstraints(
+          key,
+          field as BaseField<'object', object>,
+          value as object,
         );
         break;
     }
@@ -293,6 +336,19 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
     }
   }
 
+  private validateObjectConstraints(
+    key: string,
+    field: BaseField<'object', object> & {
+      customValidator?: (value: object) => boolean;
+    },
+    value: object,
+  ): void {
+    // Custom validation
+    if (field.customValidator && !field.customValidator(value)) {
+      throw new CustomValidationError(key, value);
+    }
+  }
+
   public init(): InferSchema<S> {
     this.configEnvironment();
     this.parse(this.environment, this.schema);
@@ -304,7 +360,7 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
   }
 
   public getParsedEnvironment(): {
-    [key: string]: string | number | boolean | undefined;
+    [key: string]: string | number | boolean | object | undefined;
   } {
     return Object.freeze(this.parsedEnvironment);
   }
