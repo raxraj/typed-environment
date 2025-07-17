@@ -2,3 +2,4 @@ build
 dist
 jest.config.ts
 coverage
+demo.ts
