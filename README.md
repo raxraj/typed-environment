@@ -10,7 +10,7 @@ A zero-dependency, TypeScript-native library to load and validate environment va
 
 - 🔒 **Type Safety**: Full TypeScript support with typed environment variables
 - ✅ **Validation**: Validate environment variables against your schema
-- 🔄 **Type Conversion**: Automatically convert string values to the appropriate type (string, number, boolean)
+- 🔄 **Type Conversion**: Automatically convert string values to the appropriate type (string, number, boolean, object)
 - 📝 **Documentation**: Self-documenting environment requirements
 - 🏷️ **Default Values**: Specify default values for optional variables
 - 🔍 **Error Handling**: Clear error messages for missing or invalid environment variables
@@ -38,6 +38,10 @@ const schema = {
     required: true, 
     choices: ['development', 'production', 'test'] 
   },
+  CONFIG: { 
+    type: 'object', 
+    required: true 
+  },
 } as const;
 
 const env = new TypedEnv(schema);
@@ -48,6 +52,7 @@ console.log(config.DATABASE_URL); // string
 console.log(config.PORT);         // number
 console.log(config.DEBUG);        // boolean
 console.log(config.NODE_ENV);     // 'development' | 'production' | 'test'
+console.log(config.CONFIG);       // object
 ```
 
 ## Advanced Validation Features
@@ -125,6 +130,49 @@ const schema = {
 } as const;
 ```
 
+### Object Validation
+
+```typescript
+const schema = {
+  // Basic object support - stores JSON as single line string in .env
+  DATABASE_CONFIG: {
+    type: 'object',
+    required: true,
+  },
+
+  // Object with custom validation
+  API_SETTINGS: {
+    type: 'object',
+    required: true,
+    customValidator: (value: object) => {
+      const config = value as any;
+      return config.endpoint && config.timeout > 0;
+    }
+  },
+
+  // Object with choices (enum validation)
+  THEME_CONFIG: {
+    type: 'object',
+    required: true,
+    choices: [
+      { theme: 'dark', layout: 'compact' },
+      { theme: 'light', layout: 'expanded' }
+    ]
+  },
+
+  // Object with default value
+  FEATURE_FLAGS: {
+    type: 'object',
+    default: { enableNewUI: false, enableBetaFeatures: false }
+  }
+} as const;
+
+// Example .env file content:
+// DATABASE_CONFIG={"host": "localhost", "port": 5432, "database": "myapp"}
+// API_SETTINGS={"endpoint": "https://api.example.com", "timeout": 5000}
+// THEME_CONFIG={"theme": "dark", "layout": "compact"}
+```
+
 ### Real-World Example
 
 ```typescript
@@ -175,6 +223,22 @@ const schema = {
     max: 10000,
     customValidator: (value: number) => value % 10 === 0, // Must be multiple of 10
   },
+
+  // Object configuration for complex settings
+  REDIS_CONFIG: {
+    type: 'object',
+    required: true,
+    customValidator: (value: object) => {
+      const config = value as any;
+      return config.host && config.port && typeof config.port === 'number';
+    }
+  },
+
+  // Feature flags as object
+  FEATURES: {
+    type: 'object',
+    default: { enableCache: true, enableMetrics: false }
+  },
 } as const;
 
 const env = new TypedEnv(schema);
@@ -197,6 +261,39 @@ const config = env.init();
 | `max` | number | Maximum numeric value |
 | `customValidator` | all | Custom validation function |
 
+## Object Support
+
+The library supports object types for complex configuration that needs to be stored as JSON strings in environment files:
+
+```bash
+# .env file
+DATABASE_CONFIG={"host": "localhost", "port": 5432, "ssl": true}
+API_ENDPOINTS={"users": "/api/users", "orders": "/api/orders"}
+FEATURE_FLAGS={"enableNewUI": true, "enableBetaFeatures": false}
+```
+
+```typescript
+const schema = {
+  DATABASE_CONFIG: { type: 'object', required: true },
+  API_ENDPOINTS: { type: 'object', required: true },
+  FEATURE_FLAGS: { type: 'object', default: { enableNewUI: false } }
+} as const;
+
+const config = env.init();
+// config.DATABASE_CONFIG is properly typed as object
+// config.API_ENDPOINTS is properly typed as object
+// config.FEATURE_FLAGS is properly typed as object
+```
+
+### Object Features
+
+- **JSON Parsing**: Objects are stored as single-line JSON strings in .env files
+- **Type Safety**: Full TypeScript support with proper type inference
+- **Nested Objects**: Support for complex nested structures and arrays
+- **Custom Validation**: Validate object structure and contents
+- **Enum Choices**: Support for predefined object configurations
+- **Default Values**: Provide fallback object configurations
+
 ## Error Handling
 
 The library provides specific error types for different validation issues:
@@ -209,6 +306,7 @@ The library provides specific error types for different validation issues:
 - `InvalidPatternError`: When a string doesn't match the required pattern
 - `InvalidNumberRangeError`: When a number is outside the allowed range
 - `CustomValidationError`: When custom validation fails
+- `InvalidJSONError`: When an object field contains invalid JSON
 
 ```typescript
 try {
@@ -218,6 +316,8 @@ try {
     console.error(`Missing required field: ${error.message}`);
   } else if (error instanceof InvalidPatternError) {
     console.error(`Pattern validation failed: ${error.message}`);
+  } else if (error instanceof InvalidJSONError) {
+    console.error(`Invalid JSON in environment variable: ${error.message}`);
   }
   // Handle other error types...
 }
