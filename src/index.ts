@@ -1,10 +1,4 @@
-import {
-  BaseField,
-  EnvSchema,
-  InferSchema,
-  NormalizeField,
-  ShorthandField,
-} from './types';
+import {BaseField, EnvSchema, InferSchema, ShorthandField} from './types';
 import * as path from 'path';
 import * as fs from 'fs';
 import {

@@ -124,6 +124,3 @@ export type InferSchema<T extends EnvSchema> = {
     T[K]
   >;
 };
-
-// Export NormalizeField type for internal use
-export type {NormalizeField};
