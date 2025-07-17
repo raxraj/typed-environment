@@ -13,6 +13,33 @@ import {
   CustomValidationError,
 } from './utils/envError';
 
+/**
+ * A TypeScript-native library for loading and validating environment variables using a custom schema.
+ *
+ * TypedEnv provides a type-safe way to access environment variables with validation, type conversion,
+ * and default values. It supports advanced validation features like string patterns, length limits,
+ * number ranges, enum choices, and custom validators.
+ *
+ * @template S - The schema type that defines the structure of environment variables
+ *
+ * @example
+ * ```typescript
+ * import TypedEnv from 'typed-environment';
+ *
+ * const schema = {
+ *   DATABASE_URL: { type: 'string', required: true },
+ *   PORT: { type: 'number', default: 3000 },
+ *   DEBUG: { type: 'boolean', default: false },
+ * } as const;
+ *
+ * const env = new TypedEnv(schema);
+ * const config = env.init();
+ *
+ * console.log(config.DATABASE_URL); // string
+ * console.log(config.PORT);         // number
+ * console.log(config.DEBUG);        // boolean
+ * ```
+ */
 export default class TypedEnv<S extends EnvSchema> extends Error {
   schema: S;
   private environment: {[key: string]: string} = {};
@@ -20,6 +47,22 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
     [key: string]: string | number | boolean | undefined;
   } = {};
 
+  /**
+   * Creates a new TypedEnv instance with the provided schema.
+   *
+   * @param schema - The schema defining the structure and validation rules for environment variables
+   *
+   * @example
+   * ```typescript
+   * const schema = {
+   *   DATABASE_URL: { type: 'string', required: true },
+   *   PORT: { type: 'number', default: 3000, min: 1000, max: 65535 },
+   *   DEBUG: { type: 'boolean', default: false },
+   * } as const;
+   *
+   * const env = new TypedEnv(schema);
+   * ```
+   */
   constructor(schema: S) {
     super();
     this.schema = schema;
@@ -61,6 +104,26 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
     );
   }
 
+  /**
+   * Loads environment variables from a .env file.
+   *
+   * This method reads the specified .env file and parses it to extract environment variables.
+   * It supports quoted values, comments, and empty lines. If the file doesn't exist,
+   * it logs a warning and continues with an empty environment.
+   *
+   * @param filePath - The path to the .env file (defaults to '.env' in the current working directory)
+   *
+   * @example
+   * ```typescript
+   * const env = new TypedEnv(schema);
+   *
+   * // Load from default .env file
+   * env.configEnvironment();
+   *
+   * // Load from custom file
+   * env.configEnvironment('./config/.env.production');
+   * ```
+   */
   configEnvironment(filePath = '.env') {
     const pathToEnvironmentFile = path.resolve(process.cwd(), filePath);
 
@@ -293,16 +356,86 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
     }
   }
 
+  /**
+   * Initializes the environment configuration and returns the parsed, validated environment variables.
+   *
+   * This method:
+   * 1. Loads environment variables from the .env file (if it exists)
+   * 2. Parses and validates each variable according to the schema
+   * 3. Applies type conversions and default values
+   * 4. Returns a fully typed configuration object
+   *
+   * @returns A typed configuration object with all environment variables
+   * @throws {MissingRequiredFieldError} When a required field is missing
+   * @throws {InvalidTypeError} When a value cannot be converted to the expected type
+   * @throws {InvalidBooleanError} When a boolean value is not 'true' or 'false'
+   * @throws {InvalidEnumError} When a value is not one of the allowed choices
+   * @throws {InvalidStringLengthError} When a string doesn't meet length requirements
+   * @throws {InvalidPatternError} When a string doesn't match the required pattern
+   * @throws {InvalidNumberRangeError} When a number is outside the allowed range
+   * @throws {CustomValidationError} When custom validation fails
+   *
+   * @example
+   * ```typescript
+   * const env = new TypedEnv(schema);
+   *
+   * try {
+   *   const config = env.init();
+   *   console.log(config.DATABASE_URL); // Fully typed and validated
+   * } catch (error) {
+   *   if (error instanceof MissingRequiredFieldError) {
+   *     console.error('Missing required field:', error.message);
+   *   }
+   * }
+   * ```
+   */
   public init(): InferSchema<S> {
     this.configEnvironment();
     this.parse(this.environment, this.schema);
     return this.parsedEnvironment as InferSchema<S>;
   }
 
+  /**
+   * Returns the raw environment variables as loaded from the .env file.
+   *
+   * This method provides access to the unparsed environment variables as they were
+   * loaded from the .env file. All values are strings and have not been type-converted
+   * or validated.
+   *
+   * @returns A frozen object containing the raw environment variables
+   *
+   * @example
+   * ```typescript
+   * const env = new TypedEnv(schema);
+   * env.configEnvironment();
+   *
+   * const rawEnv = env.getEnvironment();
+   * console.log(rawEnv.PORT); // "3000" (string)
+   * ```
+   */
   public getEnvironment(): {[key: string]: string} {
     return Object.freeze(this.environment);
   }
 
+  /**
+   * Returns the parsed and type-converted environment variables.
+   *
+   * This method provides access to the environment variables after they have been
+   * parsed and type-converted according to the schema, but before the final typing
+   * is applied. Values may be strings, numbers, booleans, or undefined.
+   *
+   * @returns A frozen object containing the parsed environment variables
+   *
+   * @example
+   * ```typescript
+   * const env = new TypedEnv(schema);
+   * env.init();
+   *
+   * const parsedEnv = env.getParsedEnvironment();
+   * console.log(parsedEnv.PORT); // 3000 (number)
+   * console.log(parsedEnv.DEBUG); // false (boolean)
+   * ```
+   */
   public getParsedEnvironment(): {
     [key: string]: string | number | boolean | undefined;
   } {
