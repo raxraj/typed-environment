@@ -19,6 +19,10 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
   private parsedEnvironment: {
     [key: string]: string | number | boolean | undefined;
   } = {};
+  private frozenEnvironment: {[key: string]: string} | null = null;
+  private frozenParsedEnvironment: {
+    [key: string]: string | number | boolean | undefined;
+  } | null = null;
 
   constructor(schema: S) {
     super();
@@ -296,16 +300,23 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
   public init(): InferSchema<S> {
     this.configEnvironment();
     this.parse(this.environment, this.schema);
+
+    // Freeze objects once after parsing is complete
+    this.frozenEnvironment = Object.freeze(this.environment);
+    this.frozenParsedEnvironment = Object.freeze(this.parsedEnvironment);
+
     return this.parsedEnvironment as InferSchema<S>;
   }
 
   public getEnvironment(): {[key: string]: string} {
-    return Object.freeze(this.environment);
+    return this.frozenEnvironment || Object.freeze(this.environment);
   }
 
   public getParsedEnvironment(): {
     [key: string]: string | number | boolean | undefined;
   } {
-    return Object.freeze(this.parsedEnvironment);
+    return (
+      this.frozenParsedEnvironment || Object.freeze(this.parsedEnvironment)
+    );
   }
 }
