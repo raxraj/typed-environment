@@ -13,7 +13,7 @@ import {
   CustomValidationError,
 } from './utils/envError';
 
-export default class TypedEnv<S extends EnvSchema> extends Error {
+export default class TypedEnv<S extends EnvSchema> {
   schema: S;
   private environment: {[key: string]: string} = {};
   private parsedEnvironment: {
@@ -21,13 +21,15 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
   } = {};
 
   constructor(schema: S) {
-    super();
     this.schema = schema;
   }
 
-  private parseLine(line: string): {key: string; value: string} | null {
+  // Simplified .env parsing - combines multiple small methods into one
+  private parseEnvLine(line: string): {key: string; value: string} | null {
     const trimmed = line.trim();
-    if (this.shouldSkipLine(trimmed)) {
+
+    // Skip empty lines and comments
+    if (!trimmed || trimmed.startsWith('#')) {
       return null;
     }
 
@@ -38,118 +40,99 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
 
     const key = trimmed.slice(0, equalsIndex).trim();
     const rawValue = trimmed.slice(equalsIndex + 1).trim();
-    const value = this.cleanupValue(rawValue);
+
+    // Remove quotes if present
+    const value =
+      (rawValue.startsWith('"') && rawValue.endsWith('"')) ||
+      (rawValue.startsWith("'") && rawValue.endsWith("'"))
+        ? rawValue.slice(1, -1)
+        : rawValue;
 
     return {key, value};
   }
 
-  private shouldSkipLine(line: string): boolean {
-    return !line || line.startsWith('#');
-  }
-
-  private cleanupValue(value: string): string {
-    if (this.isQuoted(value)) {
-      return value.slice(1, -1); // Remove surrounding quotes
-    }
-    return value;
-  }
-
-  private isQuoted(value: string): boolean {
-    return (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    );
-  }
-
+  // Simplified environment configuration
   configEnvironment(filePath = '.env') {
-    const pathToEnvironmentFile = path.resolve(process.cwd(), filePath);
+    const envFilePath = path.resolve(process.cwd(), filePath);
 
-    if (!fs.existsSync(pathToEnvironmentFile)) {
+    if (!fs.existsSync(envFilePath)) {
       console.warn(
-        `Warning: .env file not found at ${pathToEnvironmentFile}. Proceeding with empty environment.`,
+        `Warning: .env file not found at ${envFilePath}. Proceeding with empty environment.`,
       );
       return;
     }
 
-    const content = fs.readFileSync(pathToEnvironmentFile, 'utf-8');
+    const content = fs.readFileSync(envFilePath, 'utf-8');
     const lines = content.split(/\r?\n/);
 
     for (const line of lines) {
-      const parsedLine = this.parseLine(line);
-      if (parsedLine) {
-        const {key, value} = parsedLine;
-        this.environment[key] = value;
+      const parsed = this.parseEnvLine(line);
+      if (parsed) {
+        this.environment[parsed.key] = parsed.value;
       }
     }
   }
 
+  // Simplified main parsing method
   parse(environment: {[key: string]: string}, schema: EnvSchema) {
     for (const key in schema) {
       const field = schema[key];
       const value = environment[key];
 
-      this.validateRequiredField<string | number | boolean>(key, field, value);
-      this.parseAndSetValue<string | number | boolean>(key, field, value);
-      this.validateEnumChoices<string | number | boolean>(key, field);
-      this.validateAdvancedConstraints(key, field);
+      // Check if field is required and missing
+      if (
+        value === undefined &&
+        field.required &&
+        field.default === undefined
+      ) {
+        throw new MissingRequiredFieldError(key);
+      }
+
+      // Parse value based on type
+      if (field.type === 'string') {
+        this.parseStringValue(key, field, value);
+      } else if (field.type === 'number') {
+        this.parseNumberValue(key, field, value);
+      } else if (field.type === 'boolean') {
+        this.parseBooleanValue(key, field, value);
+      } else {
+        // Handle unsupported types (should not happen with proper typing, but needed for tests)
+        throw new UnsupportedTypeError((field as any).type);
+      }
+
+      // Validate constraints
+      this.validateField(key, field);
     }
   }
 
-  private validateRequiredField<T>(
-    key: string,
-    field: BaseField<'string' | 'number' | 'boolean', T>,
-    value: string | undefined,
-  ): void {
-    if (value === undefined && field.required && field.default === undefined) {
-      throw new MissingRequiredFieldError(key);
-    }
-  }
-
-  private parseAndSetValue<T>(
-    key: string,
-    field: BaseField<'string' | 'number' | 'boolean', T>,
-    value: string | undefined,
-  ): void {
-    switch (field.type) {
-      case 'string':
-        this.parseString(key, field as BaseField<'string', string>, value);
-        break;
-      case 'number':
-        this.parseNumber(key, field as BaseField<'number', number>, value);
-        break;
-      case 'boolean':
-        this.parseBoolean(key, field as BaseField<'boolean', boolean>, value);
-        break;
-      default:
-        throw new UnsupportedTypeError(field.type);
-    }
-  }
-
-  private parseString(
+  // Simplified string parsing
+  private parseStringValue(
     key: string,
     field: BaseField<'string', string>,
     value: string | undefined,
-  ): void {
+  ) {
     this.parsedEnvironment[key] = value !== undefined ? value : field.default;
   }
 
-  private parseNumber(
+  // Simplified number parsing
+  private parseNumberValue(
     key: string,
     field: BaseField<'number', number>,
     value: string | undefined,
-  ): void {
+  ) {
     const numValue = value !== undefined ? Number(value) : field.default;
-    if (numValue !== undefined && isNaN(numValue)) {
+    if (numValue !== undefined && isNaN(numValue as number)) {
       throw new InvalidTypeError(key, 'number', value);
     }
     this.parsedEnvironment[key] = numValue;
   }
 
-  private parseBoolean(
+  // Simplified boolean parsing
+  private parseBooleanValue(
     key: string,
     field: BaseField<'boolean', boolean>,
     value: string | undefined,
-  ): void {
+  ) {
     if (value && value !== 'true' && value !== 'false') {
       throw new InvalidBooleanError(key, value);
     }
@@ -157,138 +140,142 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
       value !== undefined ? value.toLowerCase() === 'true' : field.default;
   }
 
-  private validateEnumChoices<T>(
+  // Simplified validation
+  private validateField(
     key: string,
-    field: BaseField<'string' | 'number' | 'boolean', T>,
-  ): void {
-    if (
-      field.choices &&
-      !field.choices.find(choice => choice === this.parsedEnvironment[key])
-    ) {
-      throw new InvalidEnumError(
-        key,
-        field.choices as readonly (string | number | boolean)[],
-        this.parsedEnvironment[key],
-      );
-    }
-  }
-
-  private validateAdvancedConstraints(
-    key: string,
-    field: BaseField<
-      'string' | 'number' | 'boolean',
-      string | number | boolean
-    >,
-  ): void {
+    field:
+      | BaseField<'string', string>
+      | BaseField<'number', number>
+      | BaseField<'boolean', boolean>,
+  ) {
     const value = this.parsedEnvironment[key];
 
-    // Skip validation if value is undefined (handled by required field validation)
+    // Skip validation if value is undefined
     if (value === undefined) {
       return;
     }
 
-    switch (field.type) {
-      case 'string':
-        this.validateStringConstraints(
-          key,
-          field as BaseField<'string', string>,
-          value as string,
-        );
-        break;
-      case 'number':
-        this.validateNumberConstraints(
-          key,
-          field as BaseField<'number', number>,
-          value as number,
-        );
-        break;
-      case 'boolean':
-        this.validateBooleanConstraints(
-          key,
-          field as BaseField<'boolean', boolean>,
-          value as boolean,
-        );
-        break;
+    // Validate enum choices
+    if (field.choices && !field.choices.includes(value as never)) {
+      throw new InvalidEnumError(
+        key,
+        field.choices as readonly (string | number | boolean)[],
+        value,
+      );
+    }
+
+    // Type-specific validations
+    if (field.type === 'string' && typeof value === 'string') {
+      this.validateString(key, field, value);
+    } else if (field.type === 'number' && typeof value === 'number') {
+      this.validateNumber(key, field, value);
+    } else if (field.type === 'boolean' && typeof value === 'boolean') {
+      this.validateBoolean(key, field, value);
     }
   }
 
-  private validateStringConstraints(
+  // Simplified string validation
+  private validateString(
     key: string,
-    field: BaseField<'string', string> & {
+    field: BaseField<'string', string>,
+    value: string,
+  ) {
+    const stringField = field as BaseField<'string', string> & {
       minLength?: number;
       maxLength?: number;
       pattern?: RegExp | string;
       customValidator?: (value: string) => boolean;
-    },
-    value: string,
-  ): void {
+    };
+
     // Length validation
-    if (field.minLength !== undefined && value.length < field.minLength) {
+    if (
+      stringField.minLength !== undefined &&
+      value.length < stringField.minLength
+    ) {
       throw new InvalidStringLengthError(
         key,
         value,
-        field.minLength,
-        field.maxLength,
+        stringField.minLength,
+        stringField.maxLength,
       );
     }
-    if (field.maxLength !== undefined && value.length > field.maxLength) {
+    if (
+      stringField.maxLength !== undefined &&
+      value.length > stringField.maxLength
+    ) {
       throw new InvalidStringLengthError(
         key,
         value,
-        field.minLength,
-        field.maxLength,
+        stringField.minLength,
+        stringField.maxLength,
       );
     }
 
     // Pattern validation
-    if (field.pattern !== undefined) {
+    if (stringField.pattern !== undefined) {
       const regex =
-        typeof field.pattern === 'string'
-          ? new RegExp(field.pattern)
-          : field.pattern;
+        typeof stringField.pattern === 'string'
+          ? new RegExp(stringField.pattern)
+          : stringField.pattern;
       if (!regex.test(value)) {
-        throw new InvalidPatternError(key, field.pattern, value);
+        throw new InvalidPatternError(key, stringField.pattern, value);
       }
     }
 
     // Custom validation
-    if (field.customValidator && !field.customValidator(value)) {
+    if (stringField.customValidator && !stringField.customValidator(value)) {
       throw new CustomValidationError(key, value);
     }
   }
 
-  private validateNumberConstraints(
+  // Simplified number validation
+  private validateNumber(
     key: string,
-    field: BaseField<'number', number> & {
+    field: BaseField<'number', number>,
+    value: number,
+  ) {
+    const numberField = field as BaseField<'number', number> & {
       min?: number;
       max?: number;
       customValidator?: (value: number) => boolean;
-    },
-    value: number,
-  ): void {
+    };
+
     // Range validation
-    if (field.min !== undefined && value < field.min) {
-      throw new InvalidNumberRangeError(key, value, field.min, field.max);
+    if (numberField.min !== undefined && value < numberField.min) {
+      throw new InvalidNumberRangeError(
+        key,
+        value,
+        numberField.min,
+        numberField.max,
+      );
     }
-    if (field.max !== undefined && value > field.max) {
-      throw new InvalidNumberRangeError(key, value, field.min, field.max);
+    if (numberField.max !== undefined && value > numberField.max) {
+      throw new InvalidNumberRangeError(
+        key,
+        value,
+        numberField.min,
+        numberField.max,
+      );
     }
 
     // Custom validation
-    if (field.customValidator && !field.customValidator(value)) {
+    if (numberField.customValidator && !numberField.customValidator(value)) {
       throw new CustomValidationError(key, value);
     }
   }
 
-  private validateBooleanConstraints(
+  // Simplified boolean validation
+  private validateBoolean(
     key: string,
-    field: BaseField<'boolean', boolean> & {
-      customValidator?: (value: boolean) => boolean;
-    },
+    field: BaseField<'boolean', boolean>,
     value: boolean,
-  ): void {
+  ) {
+    const booleanField = field as BaseField<'boolean', boolean> & {
+      customValidator?: (value: boolean) => boolean;
+    };
+
     // Custom validation
-    if (field.customValidator && !field.customValidator(value)) {
+    if (booleanField.customValidator && !booleanField.customValidator(value)) {
       throw new CustomValidationError(key, value);
     }
   }

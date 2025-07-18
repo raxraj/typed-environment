@@ -1,29 +1,25 @@
+// Simplified base field type
 export type BaseField<Type extends 'string' | 'number' | 'boolean', T> = {
   type: Type;
   default?: T;
   required?: boolean;
   choices?: readonly T[];
+  customValidator?: (value: T) => boolean;
 } & (Type extends 'string'
   ? {
       minLength?: number;
       maxLength?: number;
       pattern?: RegExp | string;
-      customValidator?: (value: string) => boolean;
     }
   : {}) &
   (Type extends 'number'
     ? {
         min?: number;
         max?: number;
-        customValidator?: (value: number) => boolean;
-      }
-    : {}) &
-  (Type extends 'boolean'
-    ? {
-        customValidator?: (value: boolean) => boolean;
       }
     : {});
 
+// Simplified schema type
 export type EnvSchema = {
   [key: string]:
     | BaseField<'string', string>
@@ -31,29 +27,32 @@ export type EnvSchema = {
     | BaseField<'boolean', boolean>;
 };
 
+// Simplified type mapping
 type TypeMap = {
   string: string;
   number: number;
   boolean: boolean;
 };
 
-// Helper type to determine if a field is required (either explicitly required or has a default value)
+// Simplified helper types
 type IsRequired<T> = T extends {required: true}
   ? true
-  : T extends {default: any}
+  : T extends {default: unknown}
     ? true
     : false;
 
-// Helper type to infer the correct field type, including choices
-type InferFieldType<T> = T extends BaseField<any, any> & {
+type InferFieldType<T> = T extends BaseField<
+  'string' | 'number' | 'boolean',
+  unknown
+> & {
   choices: readonly (infer Choice)[];
 }
   ? Choice
-  : T extends BaseField<infer Type, any>
+  : T extends BaseField<infer Type, unknown>
     ? TypeMap[Type]
     : never;
 
-// Inference logic
+// Simplified schema inference
 export type InferSchema<T extends EnvSchema> = {
   [K in keyof T as IsRequired<T[K]> extends true ? K : never]: InferFieldType<
     T[K]
