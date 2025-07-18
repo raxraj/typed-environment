@@ -11,14 +11,13 @@ import {
   InvalidPatternError,
   InvalidNumberRangeError,
   CustomValidationError,
-  InvalidJSONError,
 } from './utils/envError';
 
 export default class TypedEnv<S extends EnvSchema> extends Error {
   schema: S;
   private environment: {[key: string]: string} = {};
   private parsedEnvironment: {
-    [key: string]: string | number | boolean | object | undefined;
+    [key: string]: string | number | boolean | undefined;
   } = {};
 
   constructor(schema: S) {
@@ -85,28 +84,91 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
   }
 
   parse(environment: {[key: string]: string}, schema: EnvSchema) {
-    for (const key in schema) {
-      const field = schema[key];
+    const flattenedSchema = this.flattenSchema(schema);
+
+    for (const key in flattenedSchema) {
+      const field = flattenedSchema[key];
       const value = environment[key];
 
-      this.validateRequiredField<string | number | boolean | object>(
-        key,
-        field,
-        value,
-      );
-      this.parseAndSetValue<string | number | boolean | object>(
-        key,
-        field,
-        value,
-      );
-      this.validateEnumChoices<string | number | boolean | object>(key, field);
+      this.validateRequiredField<string | number | boolean>(key, field, value);
+      this.parseAndSetValue<string | number | boolean>(key, field, value);
+      this.validateEnumChoices<string | number | boolean>(key, field);
       this.validateAdvancedConstraints(key, field);
     }
   }
 
+  // Helper method to flatten nested schemas into dot notation keys
+  private flattenSchema(
+    schema: any,
+    prefix = '',
+  ): {[key: string]: BaseField<'string' | 'number' | 'boolean', any>} {
+    const flattened: {
+      [key: string]: BaseField<'string' | 'number' | 'boolean', any>;
+    } = {};
+
+    for (const key in schema) {
+      const field = schema[key];
+      const fullKey = prefix
+        ? `${prefix}_${key.toUpperCase()}`
+        : key.toUpperCase();
+
+      if (this.isBaseField(field)) {
+        flattened[fullKey] = field;
+      } else if (this.isNestedSchema(field)) {
+        // It's a nested schema
+        const nestedFlattened = this.flattenSchema(field, fullKey);
+        Object.assign(flattened, nestedFlattened);
+      } else {
+        // It's neither a BaseField nor a nested schema, treat as BaseField for validation
+        flattened[fullKey] = field;
+      }
+    }
+
+    return flattened;
+  }
+
+  // Helper method to check if a field is a BaseField
+  private isBaseField(
+    field: any,
+  ): field is BaseField<'string' | 'number' | 'boolean', any> {
+    return (
+      field &&
+      typeof field === 'object' &&
+      typeof field.type === 'string' &&
+      ['string', 'number', 'boolean'].includes(field.type)
+    );
+  }
+
+  // Helper method to check if a field is a nested schema
+  private isNestedSchema(field: any): boolean {
+    // A nested schema is an object that doesn't have a "type" property that is a primitive type
+    if (!field || typeof field !== 'object') {
+      return false;
+    }
+
+    // If it has a "type" property that's a primitive type string, it's a BaseField
+    if (
+      field.type &&
+      typeof field.type === 'string' &&
+      ['string', 'number', 'boolean'].includes(field.type)
+    ) {
+      return false;
+    }
+
+    // If it has properties that look like BaseFields, it's a nested schema
+    for (const key in field) {
+      const subField = field[key];
+      if (this.isBaseField(subField) || this.isNestedSchema(subField)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   private validateRequiredField<T>(
     key: string,
-    field: BaseField<'string' | 'number' | 'boolean' | 'object', T>,
+    field: BaseField<'string' | 'number' | 'boolean', T>,
     value: string | undefined,
   ): void {
     if (value === undefined && field.required && field.default === undefined) {
@@ -116,7 +178,7 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
 
   private parseAndSetValue<T>(
     key: string,
-    field: BaseField<'string' | 'number' | 'boolean' | 'object', T>,
+    field: BaseField<'string' | 'number' | 'boolean', T>,
     value: string | undefined,
   ): void {
     switch (field.type) {
@@ -128,9 +190,6 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
         break;
       case 'boolean':
         this.parseBoolean(key, field as BaseField<'boolean', boolean>, value);
-        break;
-      case 'object':
-        this.parseObject(key, field as BaseField<'object', object>, value);
         break;
       default:
         throw new UnsupportedTypeError(field.type);
@@ -169,51 +228,27 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
       value !== undefined ? value.toLowerCase() === 'true' : field.default;
   }
 
-  private parseObject(
-    key: string,
-    field: BaseField<'object', object>,
-    value: string | undefined,
-  ): void {
-    if (value !== undefined) {
-      try {
-        this.parsedEnvironment[key] = JSON.parse(value);
-      } catch (error) {
-        throw new InvalidJSONError(key, value, (error as Error).message);
-      }
-    } else {
-      this.parsedEnvironment[key] = field.default;
-    }
-  }
-
   private validateEnumChoices<T>(
     key: string,
-    field: BaseField<'string' | 'number' | 'boolean' | 'object', T>,
+    field: BaseField<'string' | 'number' | 'boolean', T>,
   ): void {
-    if (field.choices && field.choices.length > 0) {
-      const value = this.parsedEnvironment[key];
-      const isValid = field.choices.find(choice => {
-        if (field.type === 'object') {
-          // For objects, use deep equality comparison
-          return JSON.stringify(choice) === JSON.stringify(value);
-        }
-        return choice === value;
-      });
-
-      if (!isValid) {
-        throw new InvalidEnumError(
-          key,
-          field.choices as readonly (string | number | boolean | object)[],
-          this.parsedEnvironment[key],
-        );
-      }
+    if (
+      field.choices &&
+      !field.choices.find(choice => choice === this.parsedEnvironment[key])
+    ) {
+      throw new InvalidEnumError(
+        key,
+        field.choices as readonly (string | number | boolean)[],
+        this.parsedEnvironment[key],
+      );
     }
   }
 
   private validateAdvancedConstraints(
     key: string,
     field: BaseField<
-      'string' | 'number' | 'boolean' | 'object',
-      string | number | boolean | object
+      'string' | 'number' | 'boolean',
+      string | number | boolean
     >,
   ): void {
     const value = this.parsedEnvironment[key];
@@ -243,13 +278,6 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
           key,
           field as BaseField<'boolean', boolean>,
           value as boolean,
-        );
-        break;
-      case 'object':
-        this.validateObjectConstraints(
-          key,
-          field as BaseField<'object', object>,
-          value as object,
         );
         break;
     }
@@ -336,23 +364,31 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
     }
   }
 
-  private validateObjectConstraints(
-    key: string,
-    field: BaseField<'object', object> & {
-      customValidator?: (value: object) => boolean;
-    },
-    value: object,
-  ): void {
-    // Custom validation
-    if (field.customValidator && !field.customValidator(value)) {
-      throw new CustomValidationError(key, value);
-    }
-  }
-
   public init(): InferSchema<S> {
     this.configEnvironment();
     this.parse(this.environment, this.schema);
-    return this.parsedEnvironment as InferSchema<S>;
+    return this.constructNestedResult(this.schema) as InferSchema<S>;
+  }
+
+  // Helper method to construct the nested result object from the flat parsed environment
+  private constructNestedResult(schema: any, prefix = ''): any {
+    const result: any = {};
+
+    for (const key in schema) {
+      const field = schema[key];
+      const fullKey = prefix
+        ? `${prefix}_${key.toUpperCase()}`
+        : key.toUpperCase();
+
+      if (this.isBaseField(field)) {
+        result[key] = this.parsedEnvironment[fullKey];
+      } else {
+        // It's a nested schema
+        result[key] = this.constructNestedResult(field, fullKey);
+      }
+    }
+
+    return result;
   }
 
   public getEnvironment(): {[key: string]: string} {
@@ -360,7 +396,7 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
   }
 
   public getParsedEnvironment(): {
-    [key: string]: string | number | boolean | object | undefined;
+    [key: string]: string | number | boolean | undefined;
   } {
     return Object.freeze(this.parsedEnvironment);
   }
