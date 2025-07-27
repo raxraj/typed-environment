@@ -7,3 +7,5 @@ tsconfig.tsbuildinfotsconfig.tsbuildinfo
 tsconfig.tsbuildinfo
 package-lock.json
 demo-performance.js
+demo.ts
+example.env

@@ -14,7 +14,7 @@ import {
 } from './utils/envError';
 
 export default class TypedEnv<S extends EnvSchema> extends Error {
-  schema: S;
+  schema: S | null;
   private environment: {[key: string]: string} = {};
   private parsedEnvironment: {
     [key: string]: string | number | boolean | undefined;
@@ -24,9 +24,9 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
     [key: string]: string | number | boolean | undefined;
   } | null = null;
 
-  constructor(schema: S) {
+  constructor(schema?: S) {
     super();
-    this.schema = schema;
+    this.schema = schema || null;
   }
 
   private parseLine(line: string): {key: string; value: string} | null {
@@ -63,6 +63,147 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
       (value.startsWith('"') && value.endsWith('"')) ||
       (value.startsWith("'") && value.endsWith("'"))
     );
+  }
+
+  private inferValueType(value: string): 'string' | 'number' | 'boolean' {
+    // If the value is quoted, treat it as a string
+    if (this.isQuoted(value)) {
+      return 'string';
+    }
+
+    // Check if it's a boolean value (unquoted)
+    if (this.isBooleanValue(value)) {
+      return 'boolean';
+    }
+
+    // Check if it's a number (unquoted)
+    if (this.isNumericValue(value)) {
+      return 'number';
+    }
+
+    // Default to string
+    return 'string';
+  }
+
+  private isBooleanValue(value: string): boolean {
+    const trimmedValue = value.trim();
+    const lowerValue = trimmedValue.toLowerCase();
+    return ['true', 'false', 'yes', 'no', '1', '0'].includes(lowerValue);
+  }
+
+  private isNumericValue(value: string): boolean {
+    // Empty string is not a number
+    if (value.trim() === '') {
+      return false;
+    }
+
+    // Check if it's a valid number
+    const numValue = Number(value);
+    return !isNaN(numValue) && isFinite(numValue);
+  }
+
+  public inferSchemaFromEnv(filePath = '.env'): EnvSchema {
+    const pathToEnvironmentFile = path.resolve(process.cwd(), filePath);
+
+    if (!fs.existsSync(pathToEnvironmentFile)) {
+      console.warn(
+        `Warning: .env file not found at ${pathToEnvironmentFile}. Returning empty schema.`,
+      );
+      return {};
+    }
+
+    const content = fs.readFileSync(pathToEnvironmentFile, 'utf-8');
+    const lines = content.split(/\r?\n/);
+    const schema: EnvSchema = {};
+
+    for (const line of lines) {
+      const parsedLine = this.parseLineForInference(line);
+      if (parsedLine) {
+        const {key, value, wasQuoted} = parsedLine;
+        const inferredType = this.inferValueTypeWithQuoteInfo(value, wasQuoted);
+
+        if (inferredType === 'string') {
+          schema[key] = {
+            type: 'string',
+            required: true,
+          } as BaseField<'string', string>;
+        } else if (inferredType === 'number') {
+          schema[key] = {
+            type: 'number',
+            required: true,
+          } as BaseField<'number', number>;
+        } else if (inferredType === 'boolean') {
+          schema[key] = {
+            type: 'boolean',
+            required: true,
+          } as BaseField<'boolean', boolean>;
+        }
+      }
+    }
+
+    return schema;
+  }
+
+  private parseLineForInference(
+    line: string,
+  ): {key: string; value: string; wasQuoted: boolean} | null {
+    const trimmed = line.trim();
+    if (this.shouldSkipLine(trimmed)) {
+      return null;
+    }
+
+    const equalsIndex = trimmed.indexOf('=');
+    if (equalsIndex === -1) {
+      return null;
+    }
+
+    const key = trimmed.slice(0, equalsIndex).trim();
+    const rawValue = trimmed.slice(equalsIndex + 1).trim();
+    const wasQuoted = this.isQuoted(rawValue);
+    const value = this.cleanupValue(rawValue);
+
+    return {key, value, wasQuoted};
+  }
+
+  private inferValueTypeWithQuoteInfo(
+    value: string,
+    wasQuoted: boolean,
+  ): 'string' | 'number' | 'boolean' {
+    // If the value was quoted, treat it as a string
+    if (wasQuoted) {
+      return 'string';
+    }
+
+    // Check if it's a boolean value (unquoted)
+    if (this.isBooleanValue(value)) {
+      return 'boolean';
+    }
+
+    // Check if it's a number (unquoted)
+    if (this.isNumericValue(value)) {
+      return 'number';
+    }
+
+    // Default to string
+    return 'string';
+  }
+
+  public initFromEnv(filePath = '.env'): InferSchema<S> {
+    // First infer the schema from the env file
+    const inferredSchema = this.inferSchemaFromEnv(filePath);
+
+    // Set the schema
+    this.schema = inferredSchema as S;
+
+    // Parse the environment using the inferred schema
+    this.configEnvironment(filePath);
+    this.parse(this.environment, this.schema);
+
+    // Freeze objects once after parsing is complete
+    this.frozenEnvironment = Object.freeze(this.environment);
+    this.frozenParsedEnvironment = Object.freeze(this.parsedEnvironment);
+
+    return this.parsedEnvironment as InferSchema<S>;
   }
 
   configEnvironment(filePath = '.env') {
@@ -154,11 +295,16 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
     field: BaseField<'boolean', boolean>,
     value: string | undefined,
   ): void {
-    if (value && value !== 'true' && value !== 'false') {
+    if (value && !this.isBooleanValue(value)) {
       throw new InvalidBooleanError(key, value);
     }
     this.parsedEnvironment[key] =
-      value !== undefined ? value.toLowerCase() === 'true' : field.default;
+      value !== undefined ? this.convertToBoolean(value) : field.default;
+  }
+
+  private convertToBoolean(value: string): boolean {
+    const lowerValue = value.toLowerCase().trim();
+    return ['true', 'yes', '1'].includes(lowerValue);
   }
 
   private validateEnumChoices<T>(
@@ -298,6 +444,12 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
   }
 
   public init(): InferSchema<S> {
+    if (!this.schema) {
+      throw new Error(
+        'No schema provided. Use initFromEnv() to infer schema from .env file, or provide a schema in the constructor.',
+      );
+    }
+
     this.configEnvironment();
     this.parse(this.environment, this.schema);
 
