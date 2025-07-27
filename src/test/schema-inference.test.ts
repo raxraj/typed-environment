@@ -56,10 +56,7 @@ describe('Schema Inference Tests', () => {
     });
 
     it('should infer boolean types for boolean values', () => {
-      fs.writeFileSync(
-        tempEnvPath,
-        'BOOL_TRUE=true\nBOOL_FALSE=false\nBOOL_YES=yes\nBOOL_NO=no\nBOOL_1=1\nBOOL_0=0',
-      );
+      fs.writeFileSync(tempEnvPath, 'BOOL_TRUE=true\nBOOL_FALSE=false');
 
       const env = new TypedEnv();
       const schema = env.inferSchemaFromEnv('.env.test');
@@ -72,20 +69,32 @@ describe('Schema Inference Tests', () => {
         type: 'boolean',
         required: true,
       });
+    });
+
+    it('should infer previously supported boolean values as strings', () => {
+      fs.writeFileSync(
+        tempEnvPath,
+        'BOOL_YES=yes\nBOOL_NO=no\nBOOL_1=1\nBOOL_0=0',
+      );
+
+      const env = new TypedEnv();
+      const schema = env.inferSchemaFromEnv('.env.test');
+
+      // These should now be inferred as strings since we only support true/false for booleans
       expect(schema.BOOL_YES).toEqual({
-        type: 'boolean',
+        type: 'string',
         required: true,
       });
       expect(schema.BOOL_NO).toEqual({
-        type: 'boolean',
+        type: 'string',
         required: true,
       });
       expect(schema.BOOL_1).toEqual({
-        type: 'boolean',
+        type: 'number',
         required: true,
       });
       expect(schema.BOOL_0).toEqual({
-        type: 'boolean',
+        type: 'number',
         required: true,
       });
     });
@@ -211,17 +220,10 @@ describe('Schema Inference Tests', () => {
       expect(config.DEBUG).toBe(true);
     });
 
-    it('should support enhanced boolean values with explicit schema', () => {
-      fs.writeFileSync(
-        tempEnvPath,
-        'ENABLE_YES=yes\nENABLE_NO=no\nENABLE_1=1\nENABLE_0=0\nENABLE_TRUE=true\nENABLE_FALSE=false',
-      );
+    it('should support boolean values with explicit schema', () => {
+      fs.writeFileSync(tempEnvPath, 'ENABLE_TRUE=true\nENABLE_FALSE=false');
 
       const explicitSchema = {
-        ENABLE_YES: {type: 'boolean', required: true},
-        ENABLE_NO: {type: 'boolean', required: true},
-        ENABLE_1: {type: 'boolean', required: true},
-        ENABLE_0: {type: 'boolean', required: true},
         ENABLE_TRUE: {type: 'boolean', required: true},
         ENABLE_FALSE: {type: 'boolean', required: true},
       } as const;
@@ -230,10 +232,6 @@ describe('Schema Inference Tests', () => {
       env.configEnvironment('.env.test');
       const config = env.init();
 
-      expect(config.ENABLE_YES).toBe(true);
-      expect(config.ENABLE_NO).toBe(false);
-      expect(config.ENABLE_1).toBe(true);
-      expect(config.ENABLE_0).toBe(false);
       expect(config.ENABLE_TRUE).toBe(true);
       expect(config.ENABLE_FALSE).toBe(false);
     });

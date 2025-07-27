@@ -88,7 +88,7 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
   private isBooleanValue(value: string): boolean {
     const trimmedValue = value.trim();
     const lowerValue = trimmedValue.toLowerCase();
-    return ['true', 'false', 'yes', 'no', '1', '0'].includes(lowerValue);
+    return ['true', 'false'].includes(lowerValue);
   }
 
   private isNumericValue(value: string): boolean {
@@ -103,66 +103,8 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
   }
 
   public inferSchemaFromEnv(filePath = '.env'): EnvSchema {
-    const pathToEnvironmentFile = path.resolve(process.cwd(), filePath);
-
-    if (!fs.existsSync(pathToEnvironmentFile)) {
-      console.warn(
-        `Warning: .env file not found at ${pathToEnvironmentFile}. Returning empty schema.`,
-      );
-      return {};
-    }
-
-    const content = fs.readFileSync(pathToEnvironmentFile, 'utf-8');
-    const lines = content.split(/\r?\n/);
-    const schema: EnvSchema = {};
-
-    for (const line of lines) {
-      const parsedLine = this.parseLineForInference(line);
-      if (parsedLine) {
-        const {key, value, wasQuoted} = parsedLine;
-        const inferredType = this.inferValueTypeWithQuoteInfo(value, wasQuoted);
-
-        if (inferredType === 'string') {
-          schema[key] = {
-            type: 'string',
-            required: true,
-          } as BaseField<'string', string>;
-        } else if (inferredType === 'number') {
-          schema[key] = {
-            type: 'number',
-            required: true,
-          } as BaseField<'number', number>;
-        } else if (inferredType === 'boolean') {
-          schema[key] = {
-            type: 'boolean',
-            required: true,
-          } as BaseField<'boolean', boolean>;
-        }
-      }
-    }
-
-    return schema;
-  }
-
-  private parseLineForInference(
-    line: string,
-  ): {key: string; value: string; wasQuoted: boolean} | null {
-    const trimmed = line.trim();
-    if (this.shouldSkipLine(trimmed)) {
-      return null;
-    }
-
-    const equalsIndex = trimmed.indexOf('=');
-    if (equalsIndex === -1) {
-      return null;
-    }
-
-    const key = trimmed.slice(0, equalsIndex).trim();
-    const rawValue = trimmed.slice(equalsIndex + 1).trim();
-    const wasQuoted = this.isQuoted(rawValue);
-    const value = this.cleanupValue(rawValue);
-
-    return {key, value, wasQuoted};
+    // Use the optimized configEnvironment method with schema inference
+    return this.configEnvironment(filePath, true) || {};
   }
 
   private inferValueTypeWithQuoteInfo(
@@ -189,14 +131,13 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
   }
 
   public initFromEnv(filePath = '.env'): InferSchema<S> {
-    // First infer the schema from the env file
-    const inferredSchema = this.inferSchemaFromEnv(filePath);
+    // Infer schema and load environment in one go
+    const inferredSchema = this.configEnvironment(filePath, true) as EnvSchema;
 
     // Set the schema
     this.schema = inferredSchema as S;
 
     // Parse the environment using the inferred schema
-    this.configEnvironment(filePath);
     this.parse(this.environment, this.schema);
 
     // Freeze objects once after parsing is complete
@@ -206,26 +147,56 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
     return this.parsedEnvironment as InferSchema<S>;
   }
 
-  configEnvironment(filePath = '.env') {
+  configEnvironment(filePath = '.env', inferSchema = false): EnvSchema | null {
     const pathToEnvironmentFile = path.resolve(process.cwd(), filePath);
 
     if (!fs.existsSync(pathToEnvironmentFile)) {
       console.warn(
         `Warning: .env file not found at ${pathToEnvironmentFile}. Proceeding with empty environment.`,
       );
-      return;
+      return inferSchema ? {} : null;
     }
 
     const content = fs.readFileSync(pathToEnvironmentFile, 'utf-8');
     const lines = content.split(/\r?\n/);
+    const inferredSchema: EnvSchema = {};
 
     for (const line of lines) {
       const parsedLine = this.parseLine(line);
       if (parsedLine) {
         const {key, value} = parsedLine;
         this.environment[key] = value;
+
+        // If schema inference is requested, build the schema
+        if (inferSchema) {
+          const rawValue = line.slice(line.indexOf('=') + 1).trim();
+          const wasQuoted = this.isQuoted(rawValue);
+          const inferredType = this.inferValueTypeWithQuoteInfo(
+            value,
+            wasQuoted,
+          );
+
+          if (inferredType === 'string') {
+            inferredSchema[key] = {
+              type: 'string',
+              required: true,
+            } as BaseField<'string', string>;
+          } else if (inferredType === 'number') {
+            inferredSchema[key] = {
+              type: 'number',
+              required: true,
+            } as BaseField<'number', number>;
+          } else if (inferredType === 'boolean') {
+            inferredSchema[key] = {
+              type: 'boolean',
+              required: true,
+            } as BaseField<'boolean', boolean>;
+          }
+        }
       }
     }
+
+    return inferSchema ? inferredSchema : null;
   }
 
   parse(environment: {[key: string]: string}, schema: EnvSchema) {
@@ -304,7 +275,7 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
 
   private convertToBoolean(value: string): boolean {
     const lowerValue = value.toLowerCase().trim();
-    return ['true', 'yes', '1'].includes(lowerValue);
+    return ['true'].includes(lowerValue);
   }
 
   private validateEnumChoices<T>(
@@ -445,12 +416,14 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
 
   public init(): InferSchema<S> {
     if (!this.schema) {
-      throw new Error(
-        'No schema provided. Use initFromEnv() to infer schema from .env file, or provide a schema in the constructor.',
-      );
+      // Automatically infer schema from .env file
+      const inferredSchema = this.configEnvironment('.env', true) as EnvSchema;
+      this.schema = inferredSchema as S;
+    } else {
+      // Use existing schema, just load environment
+      this.configEnvironment();
     }
 
-    this.configEnvironment();
     this.parse(this.environment, this.schema);
 
     // Freeze objects once after parsing is complete

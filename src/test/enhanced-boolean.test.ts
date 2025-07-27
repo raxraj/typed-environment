@@ -12,19 +12,12 @@ describe('Enhanced Boolean Support Tests', () => {
     }
   });
 
-  it('should parse extended boolean values correctly', () => {
-    fs.writeFileSync(
-      tempEnvPath,
-      'BOOL_TRUE=true\nBOOL_FALSE=false\nBOOL_YES=yes\nBOOL_NO=no\nBOOL_1=1\nBOOL_0=0',
-    );
+  it('should parse boolean values correctly', () => {
+    fs.writeFileSync(tempEnvPath, 'BOOL_TRUE=true\nBOOL_FALSE=false');
 
     const schema = {
       BOOL_TRUE: {type: 'boolean', required: true},
       BOOL_FALSE: {type: 'boolean', required: true},
-      BOOL_YES: {type: 'boolean', required: true},
-      BOOL_NO: {type: 'boolean', required: true},
-      BOOL_1: {type: 'boolean', required: true},
-      BOOL_0: {type: 'boolean', required: true},
     } as const;
 
     const env = new TypedEnv(schema);
@@ -33,10 +26,6 @@ describe('Enhanced Boolean Support Tests', () => {
 
     expect(config.BOOL_TRUE).toBe(true);
     expect(config.BOOL_FALSE).toBe(false);
-    expect(config.BOOL_YES).toBe(true);
-    expect(config.BOOL_NO).toBe(false);
-    expect(config.BOOL_1).toBe(true);
-    expect(config.BOOL_0).toBe(false);
   });
 
   it('should throw error for invalid boolean values', () => {
@@ -57,14 +46,12 @@ describe('Enhanced Boolean Support Tests', () => {
   it('should handle case sensitivity for boolean values', () => {
     fs.writeFileSync(
       tempEnvPath,
-      'BOOL_TRUE_UPPER=TRUE\nBOOL_FALSE_UPPER=FALSE\nBOOL_YES_UPPER=YES\nBOOL_NO_UPPER=NO',
+      'BOOL_TRUE_UPPER=TRUE\nBOOL_FALSE_UPPER=FALSE',
     );
 
     const schema = {
       BOOL_TRUE_UPPER: {type: 'boolean', required: true},
       BOOL_FALSE_UPPER: {type: 'boolean', required: true},
-      BOOL_YES_UPPER: {type: 'boolean', required: true},
-      BOOL_NO_UPPER: {type: 'boolean', required: true},
     } as const;
 
     const env = new TypedEnv(schema);
@@ -73,7 +60,21 @@ describe('Enhanced Boolean Support Tests', () => {
 
     expect(config.BOOL_TRUE_UPPER).toBe(true);
     expect(config.BOOL_FALSE_UPPER).toBe(false);
-    expect(config.BOOL_YES_UPPER).toBe(true);
-    expect(config.BOOL_NO_UPPER).toBe(false);
+  });
+
+  it('should throw error for previously supported extended boolean values', () => {
+    // Test that yes/no/1/0 are no longer supported
+    fs.writeFileSync(tempEnvPath, 'BOOL_YES=yes');
+
+    const schema = {
+      BOOL_YES: {type: 'boolean', required: true},
+    } as const;
+
+    const env = new TypedEnv(schema);
+    env.configEnvironment('.env.test');
+
+    expect(() => env.init()).toThrow(
+      'Environment variable "BOOL_YES" must be a boolean (true/false), but received "yes".',
+    );
   });
 });
