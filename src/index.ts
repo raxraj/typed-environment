@@ -253,7 +253,7 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
 
   private convertToBoolean(value: string): boolean {
     const lowerValue = value.toLowerCase().trim();
-    return ['true'].includes(lowerValue);
+    return lowerValue === 'true';
   }
 
   private validateEnumChoices<T>(
