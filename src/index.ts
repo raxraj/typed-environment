@@ -88,7 +88,7 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
   private isBooleanValue(value: string): boolean {
     const trimmedValue = value.trim();
     const lowerValue = trimmedValue.toLowerCase();
-    return ['true', 'false'].includes(lowerValue);
+    return lowerValue === 'true' || lowerValue === 'false';
   }
 
   private isNumericValue(value: string): boolean {
