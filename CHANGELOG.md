@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.7](https://github.com/raxraj/typed-environment/compare/v0.1.6...v0.1.7) (2025-07-28)
+
+
+### Features
+
+* Exclude compiled test files from npm package to reduce package size ([#30](https://github.com/raxraj/typed-environment/issues/30)) ([a90b008](https://github.com/raxraj/typed-environment/commit/a90b0080c817dab23c3c48f20d1442c6b487e3cd))
+
 ### [0.1.6](https://github.com/raxraj/typed-environment/compare/v0.1.5...v0.1.6) (2025-07-28)
 
 
