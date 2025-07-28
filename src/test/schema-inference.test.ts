@@ -20,16 +20,11 @@ describe('Schema Inference Tests', () => {
       );
 
       const env = new TypedEnv();
-      const schema = env.inferSchemaFromEnv('.env.test');
+      const config = env.init('.env.test');
 
-      expect(schema.STRING_VALUE).toEqual({
-        type: 'string',
-        required: true,
-      });
-      expect(schema.ANOTHER_STRING).toEqual({
-        type: 'string',
-        required: true,
-      });
+      // Verify that the values are parsed correctly based on inferred types
+      expect(config.STRING_VALUE).toBe('hello');
+      expect(config.ANOTHER_STRING).toBe('world with spaces');
     });
 
     it('should infer number types for numeric values', () => {
@@ -39,36 +34,21 @@ describe('Schema Inference Tests', () => {
       );
 
       const env = new TypedEnv();
-      const schema = env.inferSchemaFromEnv('.env.test');
+      const config = env.init('.env.test');
 
-      expect(schema.INTEGER_VALUE).toEqual({
-        type: 'number',
-        required: true,
-      });
-      expect(schema.FLOAT_VALUE).toEqual({
-        type: 'number',
-        required: true,
-      });
-      expect(schema.NEGATIVE_VALUE).toEqual({
-        type: 'number',
-        required: true,
-      });
+      expect(config.INTEGER_VALUE).toBe(42);
+      expect(config.FLOAT_VALUE).toBe(3.14);
+      expect(config.NEGATIVE_VALUE).toBe(-100);
     });
 
     it('should infer boolean types for boolean values', () => {
       fs.writeFileSync(tempEnvPath, 'BOOL_TRUE=true\nBOOL_FALSE=false');
 
       const env = new TypedEnv();
-      const schema = env.inferSchemaFromEnv('.env.test');
+      const config = env.init('.env.test');
 
-      expect(schema.BOOL_TRUE).toEqual({
-        type: 'boolean',
-        required: true,
-      });
-      expect(schema.BOOL_FALSE).toEqual({
-        type: 'boolean',
-        required: true,
-      });
+      expect(config.BOOL_TRUE).toBe(true);
+      expect(config.BOOL_FALSE).toBe(false);
     });
 
     it('should infer previously supported boolean values as strings', () => {
@@ -78,25 +58,13 @@ describe('Schema Inference Tests', () => {
       );
 
       const env = new TypedEnv();
-      const schema = env.inferSchemaFromEnv('.env.test');
+      const config = env.init('.env.test');
 
-      // These should now be inferred as strings since we only support true/false for booleans
-      expect(schema.BOOL_YES).toEqual({
-        type: 'string',
-        required: true,
-      });
-      expect(schema.BOOL_NO).toEqual({
-        type: 'string',
-        required: true,
-      });
-      expect(schema.BOOL_1).toEqual({
-        type: 'number',
-        required: true,
-      });
-      expect(schema.BOOL_0).toEqual({
-        type: 'number',
-        required: true,
-      });
+      // These should now be inferred as strings/numbers since we only support true/false for booleans
+      expect(config.BOOL_YES).toBe('yes');
+      expect(config.BOOL_NO).toBe('no');
+      expect(config.BOOL_1).toBe(1);
+      expect(config.BOOL_0).toBe(0);
     });
 
     it('should handle mixed types in the same file', () => {
@@ -106,24 +74,12 @@ describe('Schema Inference Tests', () => {
       );
 
       const env = new TypedEnv();
-      const schema = env.inferSchemaFromEnv('.env.test');
+      const config = env.init('.env.test');
 
-      expect(schema.DATABASE_URL).toEqual({
-        type: 'string',
-        required: true,
-      });
-      expect(schema.PORT).toEqual({
-        type: 'number',
-        required: true,
-      });
-      expect(schema.DEBUG).toEqual({
-        type: 'boolean',
-        required: true,
-      });
-      expect(schema.NODE_ENV).toEqual({
-        type: 'string',
-        required: true,
-      });
+      expect(config.DATABASE_URL).toBe('postgresql://localhost:5432/myapp');
+      expect(config.PORT).toBe(3000);
+      expect(config.DEBUG).toBe(true);
+      expect(config.NODE_ENV).toBe('development');
     });
 
     it('should handle edge cases and ambiguous values', () => {
@@ -133,27 +89,15 @@ describe('Schema Inference Tests', () => {
       );
 
       const env = new TypedEnv();
-      const schema = env.inferSchemaFromEnv('.env.test');
+      const config = env.init('.env.test');
 
       // Empty values should default to string
-      expect(schema.EMPTY_VALUE).toEqual({
-        type: 'string',
-        required: true,
-      });
+      expect(config.EMPTY_VALUE).toBe('');
 
       // Quoted values should be treated as strings
-      expect(schema.ZERO_STRING).toEqual({
-        type: 'string',
-        required: true,
-      });
-      expect(schema.NUMBER_STRING).toEqual({
-        type: 'string',
-        required: true,
-      });
-      expect(schema.QUOTED_TRUE).toEqual({
-        type: 'string',
-        required: true,
-      });
+      expect(config.ZERO_STRING).toBe('0');
+      expect(config.NUMBER_STRING).toBe('123');
+      expect(config.QUOTED_TRUE).toBe('true');
     });
   });
 
@@ -165,7 +109,7 @@ describe('Schema Inference Tests', () => {
       );
 
       const env = new TypedEnv();
-      const config = env.initFromEnv('.env.test');
+      const config = env.init('.env.test');
 
       expect(config.DATABASE_URL).toBe('postgresql://localhost:5432/myapp');
       expect(config.PORT).toBe(8080);
@@ -177,7 +121,7 @@ describe('Schema Inference Tests', () => {
       fs.writeFileSync(tempEnvPath, '# Just a comment\n\n');
 
       const env = new TypedEnv();
-      const config = env.initFromEnv('.env.test');
+      const config = env.init('.env.test');
 
       expect(config).toEqual({});
     });
@@ -189,12 +133,11 @@ describe('Schema Inference Tests', () => {
       );
 
       const env = new TypedEnv();
-      const schema = env.inferSchemaFromEnv('.env.test');
+      const config = env.init('.env.test');
 
-      expect(Object.keys(schema)).toEqual(['DATABASE_URL', 'PORT', 'DEBUG']);
-      expect(schema.DATABASE_URL.type).toBe('string');
-      expect(schema.PORT.type).toBe('number');
-      expect(schema.DEBUG.type).toBe('boolean');
+      expect(config.DATABASE_URL).toBe('postgresql://localhost:5432/myapp');
+      expect(config.PORT).toBe(3000);
+      expect(config.DEBUG).toBe(true);
     });
   });
 
@@ -212,8 +155,7 @@ describe('Schema Inference Tests', () => {
       } as const;
 
       const env = new TypedEnv(explicitSchema);
-      env.configEnvironment('.env.test');
-      const config = env.init();
+      const config = env.init('.env.test');
 
       expect(config.DATABASE_URL).toBe('postgresql://localhost:5432/myapp');
       expect(config.PORT).toBe(8080);
@@ -229,8 +171,7 @@ describe('Schema Inference Tests', () => {
       } as const;
 
       const env = new TypedEnv(explicitSchema);
-      env.configEnvironment('.env.test');
-      const config = env.init();
+      const config = env.init('.env.test');
 
       expect(config.ENABLE_TRUE).toBe(true);
       expect(config.ENABLE_FALSE).toBe(false);

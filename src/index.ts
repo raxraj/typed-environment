@@ -102,11 +102,6 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
     return !isNaN(numValue) && isFinite(numValue);
   }
 
-  public inferSchemaFromEnv(filePath = '.env'): EnvSchema {
-    // Use the optimized configEnvironment method with schema inference
-    return this.configEnvironment(filePath, true) || {};
-  }
-
   private inferValueTypeWithQuoteInfo(
     value: string,
     wasQuoted: boolean,
@@ -128,23 +123,6 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
 
     // Default to string
     return 'string';
-  }
-
-  public initFromEnv(filePath = '.env'): InferSchema<S> {
-    // Infer schema and load environment in one go
-    const inferredSchema = this.configEnvironment(filePath, true) as EnvSchema;
-
-    // Set the schema
-    this.schema = inferredSchema as S;
-
-    // Parse the environment using the inferred schema
-    this.parse(this.environment, this.schema);
-
-    // Freeze objects once after parsing is complete
-    this.frozenEnvironment = Object.freeze(this.environment);
-    this.frozenParsedEnvironment = Object.freeze(this.parsedEnvironment);
-
-    return this.parsedEnvironment as InferSchema<S>;
   }
 
   configEnvironment(filePath = '.env', inferSchema = false): EnvSchema | null {
@@ -414,14 +392,17 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
     }
   }
 
-  public init(): InferSchema<S> {
+  public init(filePath = '.env'): InferSchema<S> {
     if (!this.schema) {
-      // Automatically infer schema from .env file
-      const inferredSchema = this.configEnvironment('.env', true) as EnvSchema;
+      // Automatically infer schema from the specified file
+      const inferredSchema = this.configEnvironment(
+        filePath,
+        true,
+      ) as EnvSchema;
       this.schema = inferredSchema as S;
     } else {
       // Use existing schema, just load environment
-      this.configEnvironment();
+      this.configEnvironment(filePath);
     }
 
     this.parse(this.environment, this.schema);

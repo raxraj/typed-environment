@@ -29,8 +29,7 @@ describe('Performance Tests', () => {
     };
 
     const env = new TypedEnv(schema);
-    env.configEnvironment('.env.test');
-    env.init();
+    env.init('.env.test');
 
     // First calls should return frozen objects
     const firstEnvironment = env.getEnvironment();
@@ -75,8 +74,7 @@ describe('Performance Tests', () => {
     };
 
     const env = new TypedEnv(schema);
-    env.configEnvironment('.env.test');
-    env.init();
+    env.init('.env.test');
 
     // Measure time for multiple calls
     const iterations = 1000;
