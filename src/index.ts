@@ -14,7 +14,7 @@ import {
 } from './utils/envError';
 
 export default class TypedEnv<S extends EnvSchema> extends Error {
-  schema: S;
+  schema: S | null;
   private environment: {[key: string]: string} = {};
   private parsedEnvironment: {
     [key: string]: string | number | boolean | undefined;
@@ -24,9 +24,9 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
     [key: string]: string | number | boolean | undefined;
   } | null = null;
 
-  constructor(schema: S) {
+  constructor(schema?: S) {
     super();
-    this.schema = schema;
+    this.schema = schema || null;
   }
 
   private parseLine(line: string): {key: string; value: string} | null {
@@ -65,26 +65,96 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
     );
   }
 
-  configEnvironment(filePath = '.env') {
+  private isBooleanValue(value: string): boolean {
+    const trimmedValue = value.trim();
+    const lowerValue = trimmedValue.toLowerCase();
+    return lowerValue === 'true' || lowerValue === 'false';
+  }
+
+  private isNumericValue(value: string): boolean {
+    // Empty string is not a number
+    if (value.trim() === '') {
+      return false;
+    }
+
+    // Check if it's a valid number
+    const numValue = Number(value);
+    return !isNaN(numValue) && isFinite(numValue);
+  }
+
+  private inferValueTypeWithQuoteInfo(
+    value: string,
+    wasQuoted: boolean,
+  ): 'string' | 'number' | 'boolean' {
+    // If the value was quoted, treat it as a string
+    if (wasQuoted) {
+      return 'string';
+    }
+
+    // Check if it's a boolean value (unquoted)
+    if (this.isBooleanValue(value)) {
+      return 'boolean';
+    }
+
+    // Check if it's a number (unquoted)
+    if (this.isNumericValue(value)) {
+      return 'number';
+    }
+
+    // Default to string
+    return 'string';
+  }
+
+  configEnvironment(filePath = '.env', inferSchema = false): EnvSchema | null {
     const pathToEnvironmentFile = path.resolve(process.cwd(), filePath);
 
     if (!fs.existsSync(pathToEnvironmentFile)) {
       console.warn(
         `Warning: .env file not found at ${pathToEnvironmentFile}. Proceeding with empty environment.`,
       );
-      return;
+      return inferSchema ? {} : null;
     }
 
     const content = fs.readFileSync(pathToEnvironmentFile, 'utf-8');
     const lines = content.split(/\r?\n/);
+    const inferredSchema: EnvSchema = {};
 
     for (const line of lines) {
       const parsedLine = this.parseLine(line);
       if (parsedLine) {
         const {key, value} = parsedLine;
         this.environment[key] = value;
+
+        // If schema inference is requested, build the schema
+        if (inferSchema) {
+          const rawValue = line.slice(line.indexOf('=') + 1).trim();
+          const wasQuoted = this.isQuoted(rawValue);
+          const inferredType = this.inferValueTypeWithQuoteInfo(
+            value,
+            wasQuoted,
+          );
+
+          if (inferredType === 'string') {
+            inferredSchema[key] = {
+              type: 'string',
+              required: true,
+            } as BaseField<'string', string>;
+          } else if (inferredType === 'number') {
+            inferredSchema[key] = {
+              type: 'number',
+              required: true,
+            } as BaseField<'number', number>;
+          } else if (inferredType === 'boolean') {
+            inferredSchema[key] = {
+              type: 'boolean',
+              required: true,
+            } as BaseField<'boolean', boolean>;
+          }
+        }
       }
     }
+
+    return inferSchema ? inferredSchema : null;
   }
 
   parse(environment: {[key: string]: string}, schema: EnvSchema) {
@@ -154,11 +224,16 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
     field: BaseField<'boolean', boolean>,
     value: string | undefined,
   ): void {
-    if (value && value !== 'true' && value !== 'false') {
+    if (value && !this.isBooleanValue(value)) {
       throw new InvalidBooleanError(key, value);
     }
     this.parsedEnvironment[key] =
-      value !== undefined ? value.toLowerCase() === 'true' : field.default;
+      value !== undefined ? this.convertToBoolean(value) : field.default;
+  }
+
+  private convertToBoolean(value: string): boolean {
+    const lowerValue = value.toLowerCase().trim();
+    return lowerValue === 'true';
   }
 
   private validateEnumChoices<T>(
@@ -297,8 +372,19 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
     }
   }
 
-  public init(): InferSchema<S> {
-    this.configEnvironment();
+  public init(filePath = '.env'): InferSchema<S> {
+    if (!this.schema) {
+      // Automatically infer schema from the specified file
+      const inferredSchema = this.configEnvironment(
+        filePath,
+        true,
+      ) as EnvSchema;
+      this.schema = inferredSchema as S;
+    } else {
+      // Use existing schema, just load environment
+      this.configEnvironment(filePath);
+    }
+
     this.parse(this.environment, this.schema);
 
     // Freeze objects once after parsing is complete
