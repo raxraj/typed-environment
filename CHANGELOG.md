@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.6](https://github.com/raxraj/typed-environment/compare/v0.1.5...v0.1.6) (2025-07-28)
+
+
+### Bug Fixes
+
+* Implement schema inference from .env file with enhanced boolean support ([#27](https://github.com/raxraj/typed-environment/issues/27)) ([98fce45](https://github.com/raxraj/typed-environment/commit/98fce45b6f7c36fc7f8c6f9b5cbe01f350605a3e))
+
 ### [0.1.5](https://github.com/raxraj/typed-environment/compare/v0.1.4...v0.1.5) (2025-07-27)
 
 ### [0.1.4](https://github.com/raxraj/typed-environment/compare/v0.1.3...v0.1.4) (2025-07-18)
