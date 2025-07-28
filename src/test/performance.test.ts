@@ -74,7 +74,7 @@ describe('Performance Tests', () => {
     };
 
     const env = new TypedEnv(schema);
-    env.init('.env.test');
+    env.init(tempEnvPath);
 
     // Measure time for multiple calls
     const iterations = 1000;

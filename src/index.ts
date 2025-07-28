@@ -65,26 +65,6 @@ export default class TypedEnv<S extends EnvSchema> extends Error {
     );
   }
 
-  private inferValueType(value: string): 'string' | 'number' | 'boolean' {
-    // If the value is quoted, treat it as a string
-    if (this.isQuoted(value)) {
-      return 'string';
-    }
-
-    // Check if it's a boolean value (unquoted)
-    if (this.isBooleanValue(value)) {
-      return 'boolean';
-    }
-
-    // Check if it's a number (unquoted)
-    if (this.isNumericValue(value)) {
-      return 'number';
-    }
-
-    // Default to string
-    return 'string';
-  }
-
   private isBooleanValue(value: string): boolean {
     const trimmedValue = value.trim();
     const lowerValue = trimmedValue.toLowerCase();
