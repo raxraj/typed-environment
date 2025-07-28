@@ -20,7 +20,7 @@ describe('Schema Inference Tests', () => {
       );
 
       const env = new TypedEnv();
-      const config = env.init('.env.test');
+      const config = env.init(tempEnvPath);
 
       // Verify that the values are parsed correctly based on inferred types
       expect(config.STRING_VALUE).toBe('hello');
@@ -34,7 +34,7 @@ describe('Schema Inference Tests', () => {
       );
 
       const env = new TypedEnv();
-      const config = env.init('.env.test');
+      const config = env.init(tempEnvPath);
 
       expect(config.INTEGER_VALUE).toBe(42);
       expect(config.FLOAT_VALUE).toBe(3.14);
@@ -109,7 +109,7 @@ describe('Schema Inference Tests', () => {
       );
 
       const env = new TypedEnv();
-      const config = env.init('.env.test');
+      const config = env.init(tempEnvPath);
 
       expect(config.DATABASE_URL).toBe('postgresql://localhost:5432/myapp');
       expect(config.PORT).toBe(8080);
